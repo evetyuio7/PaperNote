@@ -1,0 +1,1763 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full select-none">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>StylusNotes Studio - iPad & Stylus Pro Notebook</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            apple: {
+              gray: '#F2F2F7',
+              darkGray: '#1C1C1E',
+              blue: '#007AFF',
+              yellow: '#FFCC00',
+              paperCream: '#FAF8F5',
+              paperDark: '#1E1F22',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Absolute touch-action isolation to stop iOS rubber-banding and default gestures */
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      touch-action: none;
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
+      overscroll-behavior: none;
+      background-color: #e5e5ea;
+    }
+
+    /* Hardware accelerated rendering */
+    canvas {
+      display: block;
+      touch-action: none;
+      transform: translateZ(0);
+      backface-visibility: hidden;
+      image-rendering: -webkit-optimize-contrast;
+    }
+
+    /* Glassmorphism utility */
+    .glass-panel {
+      background: rgba(255, 255, 255, 0.88);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.4);
+      box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.05);
+    }
+    .dark .glass-panel {
+      background: rgba(30, 30, 34, 0.85);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: 0 12px 35px -5px rgba(0, 0, 0, 0.5);
+    }
+
+    /* Tooltip styling */
+    .tooltip-hint {
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.15s ease;
+    }
+    .has-tooltip:hover .tooltip-hint {
+      opacity: 1;
+    }
+
+    /* Custom scrollbar for drawer */
+    ::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(150, 150, 150, 0.4);
+      border-radius: 9999px;
+    }
+  </style>
+</head>
+
+<body class="h-full w-full text-slate-800 dark:text-slate-100 flex flex-col relative font-sans overflow-hidden">
+
+  <!-- Top App Navigation & Quick Status -->
+  <header class="h-14 w-full z-30 px-3 sm:px-5 flex items-center justify-between glass-panel border-b border-black/5 dark:border-white/10 shrink-0">
+    <!-- Left: Document details & Drawer toggle -->
+    <div class="flex items-center space-x-2 sm:space-x-3">
+      <button id="btn-toggle-pages" class="p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 active:scale-95 transition-all text-slate-700 dark:text-slate-200" title="Pages & Notebook">
+        <i data-lucide="book-open" class="w-5 h-5"></i>
+      </button>
+
+      <div class="flex flex-col">
+        <div class="flex items-center space-x-2">
+          <input id="note-title-input" type="text" value="iPad Note 1" class="bg-transparent font-semibold text-sm sm:text-base border-b border-transparent hover:border-slate-300 dark:hover:border-slate-600 focus:border-blue-500 focus:outline-none px-1 rounded-sm transition-all max-w-[130px] sm:max-w-[240px] truncate" />
+          <span id="save-status-badge" class="inline-flex items-center text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1 animate-pulse"></span>
+            Saved
+          </span>
+        </div>
+        <span class="text-[10px] text-slate-400 px-1" id="current-page-indicator">Page 1 of 1</span>
+      </div>
+    </div>
+
+    <!-- Center: Quick Undo / Redo & Mode toggles -->
+    <div class="flex items-center space-x-1 sm:space-x-2 bg-slate-200/60 dark:bg-slate-800/80 p-1 rounded-2xl">
+      <button id="btn-undo" class="p-2 rounded-xl hover:bg-white dark:hover:bg-slate-700 active:scale-95 transition-all text-slate-700 dark:text-slate-200 disabled:opacity-30 disabled:pointer-events-none" title="Undo (Cmd+Z)">
+        <i data-lucide="undo-2" class="w-4 h-4"></i>
+      </button>
+      <button id="btn-redo" class="p-2 rounded-xl hover:bg-white dark:hover:bg-slate-700 active:scale-95 transition-all text-slate-700 dark:text-slate-200 disabled:opacity-30 disabled:pointer-events-none" title="Redo (Cmd+Shift+Z)">
+        <i data-lucide="redo-2" class="w-4 h-4"></i>
+      </button>
+      <div class="w-px h-4 bg-slate-300 dark:bg-slate-700 mx-1"></div>
+      
+      <!-- Zoom Reset Button -->
+      <button id="btn-zoom-reset" class="px-2.5 py-1 text-xs font-mono font-medium rounded-lg hover:bg-white dark:hover:bg-slate-700 active:scale-95 transition-all text-slate-700 dark:text-slate-200" title="Reset Zoom to 100%">
+        100%
+      </button>
+
+      <!-- Stylus / Finger Toggle -->
+      <button id="btn-toggle-stylus-mode" class="flex items-center space-x-1 px-2.5 py-1 rounded-xl text-xs font-medium transition-all bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-500/20" title="Apple Pencil Only Mode (Palm Rejection)">
+        <i data-lucide="pen-tool" class="w-3.5 h-3.5"></i>
+        <span class="hidden md:inline" id="stylus-mode-label">Pencil Only</span>
+      </button>
+    </div>
+
+    <!-- Right: Paper Setup, Dark Mode & Export -->
+    <div class="flex items-center space-x-1.5 sm:space-x-2">
+      <!-- Paper Template Picker Trigger -->
+      <button id="btn-paper-template" class="p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 active:scale-95 transition-all text-slate-700 dark:text-slate-200 flex items-center space-x-1" title="Change Paper Style">
+        <i data-lucide="grid-3x3" class="w-5 h-5"></i>
+        <span class="hidden lg:inline text-xs font-medium">Paper</span>
+      </button>
+
+      <!-- Export Menu Trigger -->
+      <button id="btn-export-modal" class="p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 active:scale-95 transition-all text-slate-700 dark:text-slate-200" title="Export & Share">
+        <i data-lucide="share" class="w-5 h-5"></i>
+      </button>
+
+      <!-- Dark Mode Toggle -->
+      <button id="btn-toggle-dark" class="p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 active:scale-95 transition-all text-slate-700 dark:text-slate-200" title="Toggle Theme">
+        <i data-lucide="moon" class="w-5 h-5 dark:hidden"></i>
+        <i data-lucide="sun" class="w-5 h-5 hidden dark:block"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Canvas Viewport Area -->
+  <main class="flex-1 relative w-full h-full overflow-hidden bg-slate-200 dark:bg-zinc-900 select-none cursor-crosshair" id="viewport-container">
+    
+    <!-- Coordinate / Paper Page Display Container with exact standard page aspect ratio & bounds -->
+    <div id="canvas-wrapper" class="absolute inset-0 w-full h-full flex items-center justify-center pointer-events-none">
+      <!-- Active drawing canvas layer -->
+      <canvas id="note-canvas" class="pointer-events-auto shadow-2xl transition-shadow duration-300"></canvas>
+    </div>
+
+    <!-- Live Floating Apple Pencil Info Overlay (Shows instantaneous pressure and tip radius) -->
+    <div id="live-pressure-hud" class="absolute bottom-4 left-4 z-20 pointer-events-none opacity-0 transition-opacity duration-200 flex items-center space-x-2.5 px-3 py-1.5 rounded-full glass-panel text-[11px] font-mono">
+      <div class="flex items-center space-x-1.5">
+        <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+        <span id="hud-pointer-type">Stylus</span>
+      </div>
+      <div class="w-16 bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
+        <div id="hud-pressure-bar" class="h-full bg-blue-500 rounded-full transition-all duration-75" style="width: 0%"></div>
+      </div>
+      <span id="hud-pressure-val">0.00</span>
+    </div>
+
+    <!-- Floating Gesture & Palm Rejection Indicator -->
+    <div id="gesture-toast" class="absolute top-4 left-1/2 -translate-x-1/2 z-20 pointer-events-none opacity-0 transition-all duration-300 transform -translate-y-2 px-3 py-1.5 rounded-full glass-panel text-xs font-medium text-slate-700 dark:text-slate-200 shadow-md">
+      Pencil only mode active: Finger pan/zoom enabled
+    </div>
+  </main>
+
+  <!-- Floating Tool Palette (GoodNotes / Apple Notes inspired dock) -->
+  <div id="floating-toolbar" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-30 glass-panel rounded-3xl p-2 px-3 flex items-center space-x-2 sm:space-x-3 shadow-2xl border border-white/60 dark:border-white/10 transition-all duration-200">
+    
+    <!-- Drawing Instruments Group -->
+    <div class="flex items-center space-x-1 bg-black/5 dark:bg-white/5 p-1 rounded-2xl">
+      <!-- Fountain / Pressure Pen -->
+      <button data-tool="fountain" class="tool-btn relative p-2.5 rounded-xl hover:bg-white dark:hover:bg-slate-700 active:scale-95 transition-all text-slate-700 dark:text-slate-200 active-tool" title="Fountain Pen (Dynamic Pressure)">
+        <i data-lucide="feather" class="w-5 h-5"></i>
+        <span class="w-1 h-1 rounded-full bg-blue-500 absolute bottom-1 left-1/2 -translate-x-1/2 tool-indicator"></span>
+      </button>
+
+      <!-- Monoline / Ballpoint Pen -->
+      <button data-tool="monoline" class="tool-btn relative p-2.5 rounded-xl hover:bg-white dark:hover:bg-slate-700 active:scale-95 transition-all text-slate-700 dark:text-slate-200" title="Ballpoint / Monoline (Even line)">
+        <i data-lucide="pen" class="w-5 h-5"></i>
+        <span class="w-1 h-1 rounded-full bg-blue-500 absolute bottom-1 left-1/2 -translate-x-1/2 tool-indicator hidden"></span>
+      </button>
+
+      <!-- Highlighter -->
+      <button data-tool="highlighter" class="tool-btn relative p-2.5 rounded-xl hover:bg-white dark:hover:bg-slate-700 active:scale-95 transition-all text-slate-700 dark:text-slate-200" title="Highlighter (Multiply layer)">
+        <i data-lucide="highlighter" class="w-5 h-5"></i>
+        <span class="w-1 h-1 rounded-full bg-blue-500 absolute bottom-1 left-1/2 -translate-x-1/2 tool-indicator hidden"></span>
+      </button>
+
+      <!-- Eraser with options -->
+      <button data-tool="eraser" class="tool-btn relative p-2.5 rounded-xl hover:bg-white dark:hover:bg-slate-700 active:scale-95 transition-all text-slate-700 dark:text-slate-200" title="Eraser (Pixel & Stroke erase)">
+        <i data-lucide="eraser" class="w-5 h-5"></i>
+        <span class="w-1 h-1 rounded-full bg-blue-500 absolute bottom-1 left-1/2 -translate-x-1/2 tool-indicator hidden"></span>
+      </button>
+
+      <!-- Geometric Shapes Tool -->
+      <button data-tool="shape" class="tool-btn relative p-2.5 rounded-xl hover:bg-white dark:hover:bg-slate-700 active:scale-95 transition-all text-slate-700 dark:text-slate-200" title="Geometric Shapes & Auto-Detect">
+        <i data-lucide="shapes" class="w-5 h-5"></i>
+        <span class="w-1 h-1 rounded-full bg-blue-500 absolute bottom-1 left-1/2 -translate-x-1/2 tool-indicator hidden"></span>
+      </button>
+
+      <!-- Lasso / Select Tool -->
+      <button data-tool="lasso" class="tool-btn relative p-2.5 rounded-xl hover:bg-white dark:hover:bg-slate-700 active:scale-95 transition-all text-slate-700 dark:text-slate-200" title="Lasso Selection (Move & transform)">
+        <i data-lucide="lasso" class="w-5 h-5"></i>
+        <span class="w-1 h-1 rounded-full bg-blue-500 absolute bottom-1 left-1/2 -translate-x-1/2 tool-indicator hidden"></span>
+      </button>
+    </div>
+
+    <!-- Divider -->
+    <div class="w-px h-6 bg-slate-300 dark:bg-slate-700"></div>
+
+    <!-- Primary Color Swatches & Color Wheel -->
+    <div class="flex items-center space-x-1 sm:space-x-1.5">
+      <button class="color-preset-btn w-6 h-6 rounded-full border-2 border-white dark:border-slate-800 shadow-sm transition-transform active:scale-90 ring-2 ring-blue-500" data-color="#1e293b" style="background-color: #1e293b;"></button>
+      <button class="color-preset-btn w-6 h-6 rounded-full border-2 border-white dark:border-slate-800 shadow-sm transition-transform active:scale-90" data-color="#2563eb" style="background-color: #2563eb;"></button>
+      <button class="color-preset-btn w-6 h-6 rounded-full border-2 border-white dark:border-slate-800 shadow-sm transition-transform active:scale-90" data-color="#dc2626" style="background-color: #dc2626;"></button>
+      <button class="color-preset-btn w-6 h-6 rounded-full border-2 border-white dark:border-slate-800 shadow-sm transition-transform active:scale-90" data-color="#16a34a" style="background-color: #16a34a;"></button>
+      <button class="color-preset-btn w-6 h-6 rounded-full border-2 border-white dark:border-slate-800 shadow-sm transition-transform active:scale-90" data-color="#f59e0b" style="background-color: #f59e0b;"></button>
+      
+      <!-- Custom Color Picker Input -->
+      <label class="relative w-6 h-6 rounded-full overflow-hidden border-2 border-white dark:border-slate-800 shadow-sm cursor-pointer active:scale-90 transition-transform">
+        <input id="custom-color-input" type="color" value="#1e293b" class="absolute -top-4 -left-4 w-14 h-14 cursor-pointer" />
+        <div class="w-full h-full bg-gradient-to-tr from-pink-500 via-amber-400 to-blue-500"></div>
+      </label>
+    </div>
+
+    <!-- Divider -->
+    <div class="w-px h-6 bg-slate-300 dark:bg-slate-700 hidden sm:block"></div>
+
+    <!-- Stroke Width Presets & Slider Trigger -->
+    <div class="flex items-center space-x-1">
+      <button id="btn-size-settings" class="flex items-center space-x-1 px-2.5 py-1.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 text-xs font-semibold font-mono text-slate-700 dark:text-slate-200 transition-all">
+        <div id="size-preview-dot" class="w-2.5 h-2.5 rounded-full bg-slate-800 dark:bg-white mr-1"></div>
+        <span id="stroke-size-label">3px</span>
+        <i data-lucide="chevron-up" class="w-3.5 h-3.5"></i>
+      </button>
+    </div>
+
+    <!-- Expandable Mini Popover for Stroke Width -->
+    <div id="size-popover" class="hidden absolute bottom-16 left-1/2 -translate-x-1/2 glass-panel p-4 rounded-2xl shadow-xl w-64 border border-white/60 dark:border-white/10 flex-col space-y-3">
+      <div class="flex justify-between items-center text-xs font-medium">
+        <span>Stroke Thickness</span>
+        <span id="popover-size-text" class="font-mono text-blue-600 dark:text-blue-400">3 px</span>
+      </div>
+      <input id="stroke-slider" type="range" min="1" max="40" value="3" class="w-full accent-blue-500 cursor-pointer" />
+      <div class="grid grid-cols-4 gap-2 pt-1">
+        <button class="size-preset-pill py-1 rounded-lg text-xs bg-black/5 dark:bg-white/10 hover:bg-blue-500 hover:text-white transition-all font-mono" data-size="1.5">Fine</button>
+        <button class="size-preset-pill py-1 rounded-lg text-xs bg-black/5 dark:bg-white/10 hover:bg-blue-500 hover:text-white transition-all font-mono" data-size="3">Medium</button>
+        <button class="size-preset-pill py-1 rounded-lg text-xs bg-black/5 dark:bg-white/10 hover:bg-blue-500 hover:text-white transition-all font-mono" data-size="8">Thick</button>
+        <button class="size-preset-pill py-1 rounded-lg text-xs bg-black/5 dark:bg-white/10 hover:bg-blue-500 hover:text-white transition-all font-mono" data-size="24">Marker</button>
+      </div>
+
+      <!-- Shape Tool Options (shown when shape tool is active) -->
+      <div id="shape-options-box" class="pt-2 border-t border-slate-200 dark:border-slate-700 hidden flex-col space-y-2">
+        <span class="text-xs font-medium text-slate-500">Shape Type</span>
+        <div class="grid grid-cols-4 gap-1.5 text-xs">
+          <button data-shape="line" class="shape-type-btn p-1.5 rounded-lg bg-black/5 dark:bg-white/10 hover:bg-blue-500 hover:text-white text-center">Line</button>
+          <button data-shape="arrow" class="shape-type-btn p-1.5 rounded-lg bg-black/5 dark:bg-white/10 hover:bg-blue-500 hover:text-white text-center">Arrow</button>
+          <button data-shape="rect" class="shape-type-btn p-1.5 rounded-lg bg-black/5 dark:bg-white/10 hover:bg-blue-500 hover:text-white text-center">Box</button>
+          <button data-shape="ellipse" class="shape-type-btn p-1.5 rounded-lg bg-black/5 dark:bg-white/10 hover:bg-blue-500 hover:text-white text-center">Circle</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Paper Template & Canvas Settings Modal -->
+  <div id="paper-modal" class="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="glass-panel w-full max-w-lg rounded-3xl p-6 shadow-2xl border border-white/40 dark:border-white/10 space-y-5 animate-in fade-in zoom-in duration-200">
+      <div class="flex items-center justify-between pb-3 border-b border-black/5 dark:border-white/10">
+        <div>
+          <h2 class="text-lg font-bold">Paper Style & Grid</h2>
+          <p class="text-xs text-slate-500 dark:text-slate-400">Choose exact ruling alignments for notes, math, and sketching</p>
+        </div>
+        <button id="btn-close-paper-modal" class="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-slate-400 hover:text-slate-700 dark:hover:text-white">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Paper Grid Choice Grid -->
+      <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <!-- Blank Paper -->
+        <button data-paper="blank" class="paper-card p-3 rounded-2xl border-2 border-blue-500 bg-blue-50/50 dark:bg-blue-950/30 text-left transition-all flex flex-col items-start space-y-2">
+          <div class="w-full h-16 rounded-lg bg-white dark:bg-zinc-800 shadow-inner border border-slate-200 dark:border-zinc-700 flex items-center justify-center">
+            <span class="text-[11px] text-slate-400">Plain</span>
+          </div>
+          <span class="text-xs font-semibold">Blank Paper</span>
+        </button>
+
+        <!-- Lined / Ruled Paper -->
+        <button data-paper="lined" class="paper-card p-3 rounded-2xl border-2 border-transparent hover:border-slate-300 dark:hover:border-slate-700 bg-white/60 dark:bg-zinc-800/60 text-left transition-all flex flex-col items-start space-y-2">
+          <div class="w-full h-16 rounded-lg bg-white dark:bg-zinc-800 shadow-inner border border-slate-200 dark:border-zinc-700 overflow-hidden relative">
+            <!-- Simulated lines -->
+            <div class="absolute inset-0 flex flex-col justify-between py-2">
+              <div class="w-full h-px bg-slate-300 dark:bg-zinc-600"></div>
+              <div class="w-full h-px bg-slate-300 dark:bg-zinc-600"></div>
+              <div class="w-full h-px bg-slate-300 dark:bg-zinc-600"></div>
+              <div class="w-full h-px bg-slate-300 dark:bg-zinc-600"></div>
+            </div>
+            <div class="absolute top-0 bottom-0 left-4 w-px bg-rose-300 dark:bg-rose-500/50"></div>
+          </div>
+          <span class="text-xs font-semibold">College Ruled</span>
+        </button>
+
+        <!-- Squared / Math Graph -->
+        <button data-paper="graph" class="paper-card p-3 rounded-2xl border-2 border-transparent hover:border-slate-300 dark:hover:border-slate-700 bg-white/60 dark:bg-zinc-800/60 text-left transition-all flex flex-col items-start space-y-2">
+          <div class="w-full h-16 rounded-lg bg-white dark:bg-zinc-800 shadow-inner border border-slate-200 dark:border-zinc-700 relative overflow-hidden" style="background-image: linear-gradient(to right, rgba(100,116,139,0.2) 1px, transparent 1px), linear-gradient(to bottom, rgba(100,116,139,0.2) 1px, transparent 1px); background-size: 8px 8px;">
+          </div>
+          <span class="text-xs font-semibold">Square Grid (5mm)</span>
+        </button>
+
+        <!-- Dotted Bullet Journal -->
+        <button data-paper="dotted" class="paper-card p-3 rounded-2xl border-2 border-transparent hover:border-slate-300 dark:hover:border-slate-700 bg-white/60 dark:bg-zinc-800/60 text-left transition-all flex flex-col items-start space-y-2">
+          <div class="w-full h-16 rounded-lg bg-white dark:bg-zinc-800 shadow-inner border border-slate-200 dark:border-zinc-700 relative" style="background-image: radial-gradient(rgba(100,116,139,0.5) 1px, transparent 1px); background-size: 8px 8px;">
+          </div>
+          <span class="text-xs font-semibold">Dotted Journal</span>
+        </button>
+
+        <!-- Cornell Notes -->
+        <button data-paper="cornell" class="paper-card p-3 rounded-2xl border-2 border-transparent hover:border-slate-300 dark:hover:border-slate-700 bg-white/60 dark:bg-zinc-800/60 text-left transition-all flex flex-col items-start space-y-2">
+          <div class="w-full h-16 rounded-lg bg-white dark:bg-zinc-800 shadow-inner border border-slate-200 dark:border-zinc-700 relative">
+            <div class="absolute top-0 bottom-4 left-6 w-px bg-slate-300 dark:bg-zinc-600"></div>
+            <div class="absolute bottom-4 left-0 right-0 h-px bg-slate-300 dark:bg-zinc-600"></div>
+            <span class="text-[9px] text-slate-400 absolute bottom-0.5 left-2">Summary</span>
+          </div>
+          <span class="text-xs font-semibold">Cornell Method</span>
+        </button>
+
+        <!-- Isometric Grid -->
+        <button data-paper="isometric" class="paper-card p-3 rounded-2xl border-2 border-transparent hover:border-slate-300 dark:hover:border-slate-700 bg-white/60 dark:bg-zinc-800/60 text-left transition-all flex flex-col items-start space-y-2">
+          <div class="w-full h-16 rounded-lg bg-white dark:bg-zinc-800 shadow-inner border border-slate-200 dark:border-zinc-700 relative overflow-hidden flex items-center justify-center">
+            <i data-lucide="box" class="w-6 h-6 text-slate-400"></i>
+          </div>
+          <span class="text-xs font-semibold">Isometric (3D)</span>
+        </button>
+      </div>
+
+      <!-- Paper Tint Options -->
+      <div class="pt-2 flex items-center justify-between">
+        <span class="text-xs font-medium">Page Color Tint:</span>
+        <div class="flex items-center space-x-2">
+          <button data-tint="white" class="tint-btn px-3 py-1 rounded-xl text-xs font-medium border border-slate-300 dark:border-slate-600 bg-white dark:bg-zinc-700 ring-2 ring-blue-500">Pure White</button>
+          <button data-tint="cream" class="tint-btn px-3 py-1 rounded-xl text-xs font-medium border border-slate-300 dark:border-slate-600 bg-[#FDFBF7] text-amber-900">Warm Ivory</button>
+          <button data-tint="dark" class="tint-btn px-3 py-1 rounded-xl text-xs font-medium border border-slate-300 dark:border-slate-600 bg-[#1E1F22] text-slate-200">Dark Paper</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Slide-out Pages Drawer & Notebook Manager -->
+  <div id="pages-drawer" class="fixed top-0 left-0 bottom-0 w-80 z-40 glass-panel -translate-x-full transition-transform duration-300 flex flex-col shadow-2xl border-r border-black/10 dark:border-white/10">
+    <div class="p-4 border-b border-black/5 dark:border-white/10 flex items-center justify-between">
+      <div>
+        <h3 class="font-bold text-base">Notebook Pages</h3>
+        <span class="text-xs text-slate-400" id="drawer-doc-summary">1 Page Total</span>
+      </div>
+      <button id="btn-close-pages-drawer" class="p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 text-slate-500">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+    </div>
+
+    <!-- Pages List Container -->
+    <div id="pages-list" class="flex-1 overflow-y-auto p-4 space-y-3">
+      <!-- Dynamically generated page thumbnails -->
+    </div>
+
+    <!-- Bottom Actions: Add Page & Clear Canvas -->
+    <div class="p-4 border-t border-black/5 dark:border-white/10 space-y-2 bg-black/[0.02] dark:bg-white/[0.02]">
+      <button id="btn-add-page" class="w-full py-2.5 px-4 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm flex items-center justify-center space-x-2 shadow-lg shadow-blue-500/20 active:scale-[0.98] transition-all">
+        <i data-lucide="plus" class="w-4 h-4"></i>
+        <span>Add Blank Page</span>
+      </button>
+
+      <button id="btn-clear-current-page" class="w-full py-2 px-4 rounded-xl hover:bg-rose-500/10 text-rose-600 dark:text-rose-400 font-medium text-xs flex items-center justify-center space-x-1.5 transition-all">
+        <i data-lucide="trash-2" class="w-4 h-4"></i>
+        <span>Clear Current Page</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Export & Cloud Backup Modal -->
+  <div id="export-modal" class="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="glass-panel w-full max-w-md rounded-3xl p-6 shadow-2xl border border-white/40 dark:border-white/10 space-y-4">
+      <div class="flex items-center justify-between pb-2 border-b border-black/5 dark:border-white/10">
+        <h3 class="font-bold text-base">Export Document</h3>
+        <button id="btn-close-export-modal" class="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="space-y-2.5">
+        <button id="btn-export-png" class="w-full p-3.5 rounded-2xl bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 hover:border-blue-500 flex items-center space-x-3 text-left transition-all group">
+          <div class="p-2.5 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+            <i data-lucide="image" class="w-5 h-5"></i>
+          </div>
+          <div class="flex-1">
+            <div class="text-sm font-semibold">High-Res PNG Image</div>
+            <div class="text-xs text-slate-400">Export active page at full iPad Retina 2x scale</div>
+          </div>
+        </button>
+
+        <button id="btn-export-json" class="w-full p-3.5 rounded-2xl bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 hover:border-blue-500 flex items-center space-x-3 text-left transition-all group">
+          <div class="p-2.5 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 group-hover:bg-purple-600 group-hover:text-white transition-colors">
+            <i data-lucide="file-code" class="w-5 h-5"></i>
+          </div>
+          <div class="flex-1">
+            <div class="text-sm font-semibold">Vector Note Backup (.json)</div>
+            <div class="text-xs text-slate-400">Save vector strokes, pressure data, and all pages</div>
+          </div>
+        </button>
+
+        <!-- Import JSON file -->
+        <label class="w-full p-3.5 rounded-2xl bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 hover:border-blue-500 flex items-center space-x-3 text-left transition-all group cursor-pointer">
+          <div class="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+            <i data-lucide="upload" class="w-5 h-5"></i>
+          </div>
+          <div class="flex-1">
+            <div class="text-sm font-semibold">Import Backup File</div>
+            <div class="text-xs text-slate-400">Restore existing document from file</div>
+          </div>
+          <input type="file" id="import-json-input" accept=".json" class="hidden" />
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <!-- Custom Toast Notification Container -->
+  <div id="toast" class="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 pointer-events-none opacity-0 transition-all duration-300 transform translate-y-2 glass-panel px-4 py-2 rounded-full text-xs font-semibold shadow-xl border border-white/40 dark:border-white/10 text-slate-800 dark:text-slate-100">
+    Notification
+  </div>
+
+  <script>
+    /* ==========================================================================
+       IndexedDB & Document Persistence Architecture
+       ========================================================================== */
+    const DB_NAME = 'StylusNotesApp_DB';
+    const DB_VERSION = 1;
+    const STORE_NAME = 'notebooks';
+
+    class StorageService {
+      constructor() {
+        this.db = null;
+      }
+
+      async init() {
+        return new Promise((resolve, reject) => {
+          const request = indexedDB.open(DB_NAME, DB_VERSION);
+          request.onupgradeneeded = (e) => {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains(STORE_NAME)) {
+              db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+            }
+          };
+          request.onsuccess = (e) => {
+            this.db = e.target.result;
+            resolve();
+          };
+          request.onerror = (e) => reject(e);
+        });
+      }
+
+      async saveDoc(doc) {
+        if (!this.db) await this.init();
+        return new Promise((resolve, reject) => {
+          const tx = this.db.transaction(STORE_NAME, 'readwrite');
+          const store = tx.objectStore(STORE_NAME);
+          store.put(doc);
+          tx.oncomplete = () => resolve();
+          tx.onerror = (e) => reject(e);
+        });
+      }
+
+      async loadDoc(id) {
+        if (!this.db) await this.init();
+        return new Promise((resolve, reject) => {
+          const tx = this.db.transaction(STORE_NAME, 'readonly');
+          const store = tx.objectStore(STORE_NAME);
+          const request = store.get(id);
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = (e) => reject(e);
+        });
+      }
+    }
+
+    const storage = new StorageService();
+
+    /* ==========================================================================
+       Application State
+       ========================================================================== */
+    const state = {
+      docId: 'default_note_1',
+      title: 'iPad Notes Pro',
+      pages: [
+        {
+          id: 'page_1',
+          paper: 'grid', // 'blank' | 'lined' | 'graph' | 'dotted' | 'cornell' | 'isometric'
+          tint: 'white',  // 'white' | 'cream' | 'dark'
+          strokes: []
+        }
+      ],
+      currentPageIndex: 0,
+      
+      // Active tool configurations
+      activeTool: 'fountain', // 'fountain' | 'monoline' | 'highlighter' | 'eraser' | 'shape' | 'lasso'
+      strokeColor: '#1e293b',
+      strokeSize: 3.0,
+      activeShape: 'line', // 'line' | 'arrow' | 'rect' | 'ellipse'
+      
+      // Hardware & Stylus settings
+      pencilOnlyMode: true, // If true, finger only zooms/pans; pen draws!
+      smoothingFactor: 0.85,
+      
+      // Viewport transform (Pan and Zoom)
+      zoom: 1.0,
+      panX: 0,
+      panY: 0,
+
+      // Undo / Redo stacks
+      undoStack: [],
+      redoStack: [],
+
+      // Selection state for Lasso
+      selectedStrokes: [],
+      lassoPolygon: []
+    };
+
+    // Logical page dimensions (standard A4 / iPad 4:3 high-res canvas: 1600 x 2133)
+    const PAGE_WIDTH = 1600;
+    const PAGE_HEIGHT = 2133;
+    const GRID_SPACING = 40; // Base millimeter grid alignment
+
+    /* ==========================================================================
+       DOM Elements
+       ========================================================================== */
+    const viewport = document.getElementById('viewport-container');
+    const canvas = document.getElementById('note-canvas');
+    const ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
+
+    // UI elements
+    const noteTitleInput = document.getElementById('note-title-input');
+    const saveBadge = document.getElementById('save-status-badge');
+    const currentPageIndicator = document.getElementById('current-page-indicator');
+    const btnUndo = document.getElementById('btn-undo');
+    const btnRedo = document.getElementById('btn-redo');
+    const btnZoomReset = document.getElementById('btn-zoom-reset');
+    const btnToggleStylus = document.getElementById('btn-toggle-stylus-mode');
+    const stylusModeLabel = document.getElementById('stylus-mode-label');
+    const gestureToast = document.getElementById('gesture-toast');
+    
+    const livePressureHud = document.getElementById('live-pressure-hud');
+    const hudPressureBar = document.getElementById('hud-pressure-bar');
+    const hudPressureVal = document.getElementById('hud-pressure-val');
+    const hudPointerType = document.getElementById('hud-pointer-type');
+
+    const floatingToolbar = document.getElementById('floating-toolbar');
+    const toolBtns = document.querySelectorAll('.tool-btn');
+    const colorPresetBtns = document.querySelectorAll('.color-preset-btn');
+    const customColorInput = document.getElementById('custom-color-input');
+    const btnSizeSettings = document.getElementById('btn-size-settings');
+    const sizePopover = document.getElementById('size-popover');
+    const strokeSlider = document.getElementById('stroke-slider');
+    const strokeSizeLabel = document.getElementById('stroke-size-label');
+    const popoverSizeText = document.getElementById('popover-size-text');
+    const sizePreviewDot = document.getElementById('size-preview-dot');
+    const shapeOptionsBox = document.getElementById('shape-options-box');
+    const shapeTypeBtns = document.querySelectorAll('.shape-type-btn');
+
+    const paperModal = document.getElementById('paper-modal');
+    const btnPaperTemplate = document.getElementById('btn-paper-template');
+    const btnClosePaperModal = document.getElementById('btn-close-paper-modal');
+    const paperCards = document.querySelectorAll('.paper-card');
+    const tintBtns = document.querySelectorAll('.tint-btn');
+
+    const pagesDrawer = document.getElementById('pages-drawer');
+    const btnTogglePages = document.getElementById('btn-toggle-pages');
+    const btnClosePagesDrawer = document.getElementById('btn-close-pages-drawer');
+    const pagesList = document.getElementById('pages-list');
+    const btnAddPage = document.getElementById('btn-add-page');
+    const btnClearCurrentPage = document.getElementById('btn-clear-current-page');
+    const drawerDocSummary = document.getElementById('drawer-doc-summary');
+
+    const exportModal = document.getElementById('export-modal');
+    const btnExportModal = document.getElementById('btn-export-modal');
+    const btnCloseExportModal = document.getElementById('btn-close-export-modal');
+    const btnExportPng = document.getElementById('btn-export-png');
+    const btnExportJson = document.getElementById('btn-export-json');
+    const importJsonInput = document.getElementById('import-json-input');
+    const toast = document.getElementById('toast');
+
+    /* ==========================================================================
+       Canvas Setup & High-DPI Coordinate Mapping
+       ========================================================================== */
+    function resizeCanvas() {
+      // Set fixed logical page dimensions
+      canvas.width = PAGE_WIDTH;
+      canvas.height = PAGE_HEIGHT;
+      updateCanvasTransform();
+      renderCurrentPage();
+    }
+
+    // Centered zoom & pan transform
+    function updateCanvasTransform() {
+      const vWidth = viewport.clientWidth;
+      const vHeight = viewport.clientHeight;
+      
+      // Calculate screen placement so the page is centered with pan & zoom
+      const left = (vWidth - PAGE_WIDTH * state.zoom) / 2 + state.panX;
+      const top = (vHeight - PAGE_HEIGHT * state.zoom) / 2 + state.panY;
+
+      canvas.style.width = `${PAGE_WIDTH * state.zoom}px`;
+      canvas.style.height = `${PAGE_HEIGHT * state.zoom}px`;
+      canvas.style.position = 'absolute';
+      canvas.style.left = `${left}px`;
+      canvas.style.top = `${top}px`;
+
+      btnZoomReset.textContent = `${Math.round(state.zoom * 100)}%`;
+    }
+
+    // Convert Screen (clientX, clientY) to Page Coordinates (0 to PAGE_WIDTH, 0 to PAGE_HEIGHT)
+    function screenToPage(clientX, clientY) {
+      const rect = canvas.getBoundingClientRect();
+      const x = (clientX - rect.left) * (PAGE_WIDTH / rect.width);
+      const y = (clientY - rect.top) * (PAGE_HEIGHT / rect.height);
+      return { x, y };
+    }
+
+    // Verify if point is inside page
+    function isInsidePage(pagePt) {
+      return pagePt.x >= 0 && pagePt.x <= PAGE_WIDTH && pagePt.y >= 0 && pagePt.y <= PAGE_HEIGHT;
+    }
+
+    /* ==========================================================================
+       Procedural Paper Rendering (Lined, Grid, Dotted, Cornell, Isometric)
+       All patterns are rendered dynamically without raster scaling artifacts.
+       ========================================================================== */
+    function getPaperBackgroundColor(tint) {
+      if (tint === 'cream') return '#FAF6EE';
+      if (tint === 'dark') return '#1A1B1E';
+      return '#FFFFFF';
+    }
+
+    function getPaperGridLineColor(tint) {
+      if (tint === 'dark') return 'rgba(255, 255, 255, 0.08)';
+      return 'rgba(60, 80, 120, 0.12)';
+    }
+
+    function renderPaperBackground(page) {
+      const bgColor = getPaperBackgroundColor(page.tint);
+      const gridColor = getPaperGridLineColor(page.tint);
+
+      // 1. Fill base paper color
+      ctx.fillStyle = bgColor;
+      ctx.fillRect(0, 0, PAGE_WIDTH, PAGE_HEIGHT);
+
+      ctx.save();
+      ctx.lineWidth = 1.0;
+      ctx.strokeStyle = gridColor;
+      ctx.fillStyle = gridColor;
+
+      const spacing = GRID_SPACING;
+
+      switch (page.paper) {
+        case 'lined': {
+          // Standard horizontal lines
+          const topMargin = 160;
+          const leftMargin = 160;
+
+          // Draw horizontal ruled lines
+          for (let y = topMargin; y < PAGE_HEIGHT - 60; y += spacing) {
+            ctx.beginPath();
+            ctx.moveTo(0, y);
+            ctx.lineTo(PAGE_WIDTH, y);
+            ctx.stroke();
+          }
+
+          // Draw standard left vertical margin rule
+          ctx.strokeStyle = page.tint === 'dark' ? 'rgba(239, 68, 68, 0.3)' : 'rgba(239, 68, 68, 0.4)';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(leftMargin, 0);
+          ctx.lineTo(leftMargin, PAGE_HEIGHT);
+          ctx.stroke();
+          break;
+        }
+
+        case 'graph': {
+          // Precise 5mm engineering grid
+          ctx.beginPath();
+          // Verticals
+          for (let x = 0; x <= PAGE_WIDTH; x += spacing) {
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, PAGE_HEIGHT);
+          }
+          // Horizontals
+          for (let y = 0; y <= PAGE_HEIGHT; y += spacing) {
+            ctx.moveTo(0, y);
+            ctx.lineTo(PAGE_WIDTH, y);
+          }
+          ctx.stroke();
+          break;
+        }
+
+        case 'dotted': {
+          // Bullet Journal dot matrix
+          const radius = page.tint === 'dark' ? 1.5 : 1.2;
+          for (let x = spacing; x < PAGE_WIDTH; x += spacing) {
+            for (let y = spacing; y < PAGE_HEIGHT; y += spacing) {
+              ctx.beginPath();
+              ctx.arc(x, y, radius, 0, Math.PI * 2);
+              ctx.fill();
+            }
+          }
+          break;
+        }
+
+        case 'cornell': {
+          // Cornell layout: Cue column on left (30%), Summary at bottom (20%)
+          const cueWidth = PAGE_WIDTH * 0.28;
+          const summaryHeight = PAGE_HEIGHT * 0.20;
+          const topHeader = 140;
+
+          // Header line
+          ctx.beginPath();
+          ctx.moveTo(0, topHeader);
+          ctx.lineTo(PAGE_WIDTH, topHeader);
+          ctx.stroke();
+
+          // Left Cue separator
+          ctx.beginPath();
+          ctx.moveTo(cueWidth, topHeader);
+          ctx.lineTo(cueWidth, PAGE_HEIGHT - summaryHeight);
+          ctx.stroke();
+
+          // Bottom Summary separator
+          ctx.beginPath();
+          ctx.moveTo(0, PAGE_HEIGHT - summaryHeight);
+          ctx.lineTo(PAGE_WIDTH, PAGE_HEIGHT - summaryHeight);
+          ctx.stroke();
+
+          // Ruled lines inside note body
+          for (let y = topHeader + spacing; y < PAGE_HEIGHT - summaryHeight; y += spacing) {
+            ctx.beginPath();
+            ctx.moveTo(cueWidth, y);
+            ctx.lineTo(PAGE_WIDTH, y);
+            ctx.stroke();
+          }
+
+          // Labels
+          ctx.font = '600 13px Inter';
+          ctx.fillStyle = page.tint === 'dark' ? '#666' : '#999';
+          ctx.fillText('CUE COLUMN / KEYWORDS', 30, topHeader + 30);
+          ctx.fillText('NOTES / LECTURE CONTENT', cueWidth + 30, topHeader + 30);
+          ctx.fillText('SUMMARY & REFLECTION', 30, PAGE_HEIGHT - summaryHeight + 35);
+          break;
+        }
+
+        case 'isometric': {
+          // 3D Isometric grid (60 degree angle diagonals)
+          const isoH = spacing * Math.sqrt(3) / 2;
+          ctx.lineWidth = 0.75;
+          ctx.beginPath();
+          for (let y = 0; y < PAGE_HEIGHT; y += isoH * 2) {
+            for (let x = 0; x < PAGE_WIDTH; x += spacing) {
+              // Draw isometric triangles
+              ctx.moveTo(x, y);
+              ctx.lineTo(x + spacing / 2, y + isoH);
+              ctx.lineTo(x, y + isoH * 2);
+              ctx.lineTo(x - spacing / 2, y + isoH);
+              ctx.closePath();
+            }
+          }
+          ctx.stroke();
+          break;
+        }
+
+        case 'blank':
+        default:
+          // Blank paper needs no additional overlay lines
+          break;
+      }
+
+      ctx.restore();
+    }
+
+    /* ==========================================================================
+       High-Fidelity Stylus Inking & Smoothing
+       Uses quadratic Bezier spline interpolation with dynamic pressure scaling.
+       ========================================================================== */
+    function drawStroke(context, stroke) {
+      if (!stroke || !stroke.points || stroke.points.length === 0) return;
+
+      context.save();
+
+      // Tool blending & composite operations
+      if (stroke.tool === 'highlighter') {
+        context.globalCompositeOperation = 'multiply';
+        context.globalAlpha = 0.38;
+        context.lineCap = 'round';
+        context.lineJoin = 'round';
+        context.strokeStyle = stroke.color;
+      } else if (stroke.tool === 'eraser') {
+        // Pixel eraser clears down to background color
+        context.globalCompositeOperation = 'destination-out';
+        context.lineCap = 'round';
+        context.lineJoin = 'round';
+      } else {
+        context.globalCompositeOperation = 'source-over';
+        context.globalAlpha = 1.0;
+        context.lineCap = 'round';
+        context.lineJoin = 'round';
+        context.strokeStyle = stroke.color;
+        context.fillStyle = stroke.color;
+      }
+
+      // Handle Geometric Shape Strokes
+      if (stroke.isShape) {
+        drawGeometricShape(context, stroke);
+        context.restore();
+        return;
+      }
+
+      const pts = stroke.points;
+
+      if (pts.length === 1) {
+        // Single tap dot with pressure
+        const p = pts[0];
+        const r = Math.max(1, (p.pressure || 0.5) * stroke.size);
+        context.beginPath();
+        context.arc(p.x, p.y, r, 0, Math.PI * 2);
+        context.fill();
+        context.restore();
+        return;
+      }
+
+      // Variable width pressure interpolation for Fountain & Monoline
+      if (stroke.tool === 'fountain' || stroke.tool === 'monoline') {
+        for (let i = 1; i < pts.length; i++) {
+          const p1 = pts[i - 1];
+          const p2 = pts[i];
+
+          // Fountain pen scales width between 0.3x and 1.8x based on stylus pressure
+          let width1 = stroke.size;
+          let width2 = stroke.size;
+          
+          if (stroke.tool === 'fountain') {
+            const press1 = (p1.pressure !== undefined && p1.pressure > 0) ? p1.pressure : 0.5;
+            const press2 = (p2.pressure !== undefined && p2.pressure > 0) ? p2.pressure : 0.5;
+            width1 = stroke.size * (0.35 + press1 * 1.5);
+            width2 = stroke.size * (0.35 + press2 * 1.5);
+          }
+
+          context.beginPath();
+          context.moveTo(p1.x, p1.y);
+          context.lineTo(p2.x, p2.y);
+          context.lineWidth = (width1 + width2) / 2;
+          context.stroke();
+        }
+      } else {
+        // Highlighter and standard eraser: Smooth quadratic Bezier spline
+        context.lineWidth = stroke.size;
+        context.beginPath();
+        context.moveTo(pts[0].x, pts[0].y);
+
+        for (let i = 1; i < pts.length - 1; i++) {
+          const xc = (pts[i].x + pts[i + 1].x) / 2;
+          const yc = (pts[i].y + pts[i + 1].y) / 2;
+          context.quadraticCurveTo(pts[i].x, pts[i].y, xc, yc);
+        }
+
+        const last = pts[pts.length - 1];
+        context.lineTo(last.x, last.y);
+        context.stroke();
+      }
+
+      context.restore();
+    }
+
+    // Render Geometric Shapes (Straight Lines, Arrows, Rectangles, Ellipses)
+    function drawGeometricShape(context, stroke) {
+      const p1 = stroke.points[0];
+      const p2 = stroke.points[stroke.points.length - 1];
+      context.lineWidth = stroke.size;
+      context.strokeStyle = stroke.color;
+
+      context.beginPath();
+      switch (stroke.shapeType) {
+        case 'line':
+          context.moveTo(p1.x, p1.y);
+          context.lineTo(p2.x, p2.y);
+          context.stroke();
+          break;
+
+        case 'arrow': {
+          const headlen = Math.max(12, stroke.size * 3.5);
+          const dx = p2.x - p1.x;
+          const dy = p2.y - p1.y;
+          const angle = Math.atan2(dy, dx);
+          
+          context.moveTo(p1.x, p1.y);
+          context.lineTo(p2.x, p2.y);
+          context.stroke();
+
+          // Arrow head
+          context.beginPath();
+          context.moveTo(p2.x, p2.y);
+          context.lineTo(p2.x - headlen * Math.cos(angle - Math.PI / 6), p2.y - headlen * Math.sin(angle - Math.PI / 6));
+          context.lineTo(p2.x - headlen * Math.cos(angle + Math.PI / 6), p2.y - headlen * Math.sin(angle + Math.PI / 6));
+          context.closePath();
+          context.fillStyle = stroke.color;
+          context.fill();
+          break;
+        }
+
+        case 'rect': {
+          const x = Math.min(p1.x, p2.x);
+          const y = Math.min(p1.y, p2.y);
+          const w = Math.abs(p2.x - p1.x);
+          const h = Math.abs(p2.y - p1.y);
+          context.strokeRect(x, y, w, h);
+          break;
+        }
+
+        case 'ellipse': {
+          const rx = Math.abs(p2.x - p1.x) / 2;
+          const ry = Math.abs(p2.y - p1.y) / 2;
+          const cx = Math.min(p1.x, p2.x) + rx;
+          const cy = Math.min(p1.y, p2.y) + ry;
+          context.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+          context.stroke();
+          break;
+        }
+      }
+    }
+
+    /* ==========================================================================
+       Full Viewport Render Pipeline
+       ========================================================================== */
+    function renderCurrentPage() {
+      const page = state.pages[state.currentPageIndex];
+      if (!page) return;
+
+      // Clear entire canvas
+      ctx.clearRect(0, 0, PAGE_WIDTH, PAGE_HEIGHT);
+
+      // 1. Render aligned paper background pattern
+      renderPaperBackground(page);
+
+      // 2. Render all completed strokes
+      for (const stroke of page.strokes) {
+        drawStroke(ctx, stroke);
+      }
+
+      // 3. Render in-progress active stroke
+      if (activeStroke) {
+        drawStroke(ctx, activeStroke);
+      }
+
+      // 4. Render Lasso Selection Marquee
+      if (state.activeTool === 'lasso' && state.lassoPolygon.length > 1) {
+        ctx.save();
+        ctx.strokeStyle = '#007AFF';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6, 6]);
+        ctx.beginPath();
+        ctx.moveTo(state.lassoPolygon[0].x, state.lassoPolygon[0].y);
+        for (let i = 1; i < state.lassoPolygon.length; i++) {
+          ctx.lineTo(state.lassoPolygon[i].x, state.lassoPolygon[i].y);
+        }
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // Update undo/redo button disabled states
+      btnUndo.disabled = state.undoStack.length === 0;
+      btnRedo.disabled = state.redoStack.length === 0;
+    }
+
+    /* ==========================================================================
+       Apple Pencil & Stylus Touch Engine with Hardware Pressure
+       Supports Coalesced Events for 120Hz/240Hz sub-millisecond precision.
+       ========================================================================== */
+    let activeStroke = null;
+    let isDrawing = false;
+    let activePointerId = null;
+
+    // Multi-touch gestures (two-finger pan & pinch-zoom)
+    const activeTouches = new Map();
+    let initialPinchDistance = 0;
+    let initialPinchZoom = 1.0;
+    let initialPan = { x: 0, y: 0 };
+    let gestureCenter = { x: 0, y: 0 };
+
+    function getPinchDistance(t1, t2) {
+      const dx = t1.clientX - t2.clientX;
+      const dy = t1.clientY - t2.clientY;
+      return Math.hypot(dx, dy);
+    }
+
+    function getTouchMidpoint(t1, t2) {
+      return {
+        x: (t1.clientX + t2.clientX) / 2,
+        y: (t1.clientY + t2.clientY) / 2
+      };
+    }
+
+    // Pointer Down Event
+    viewport.addEventListener('pointerdown', (e) => {
+      // Manage multi-touch gestures when using fingers
+      if (e.pointerType === 'touch') {
+        activeTouches.set(e.pointerId, e);
+
+        // If two fingers are detected, trigger zoom/pan mode
+        if (activeTouches.size === 2) {
+          if (isDrawing && activeStroke) {
+            // Cancel drawing stroke if another finger touches down (palm rejection)
+            activeStroke = null;
+            isDrawing = false;
+            renderCurrentPage();
+          }
+          const [t1, t2] = Array.from(activeTouches.values());
+          initialPinchDistance = getPinchDistance(t1, t2);
+          initialPinchZoom = state.zoom;
+          initialPan = { x: state.panX, y: state.panY };
+          gestureCenter = getTouchMidpoint(t1, t2);
+          return;
+        }
+
+        // In Pencil Only Mode, reject single finger drawing
+        if (state.pencilOnlyMode) {
+          showGestureToast('Palm rejection active: Pencil writes, 2 fingers pan & zoom');
+          return;
+        }
+      }
+
+      // Check if another pointer is already drawing
+      if (isDrawing) return;
+
+      const pagePos = screenToPage(e.clientX, e.clientY);
+      if (!isInsidePage(pagePos)) return;
+
+      isDrawing = true;
+      activePointerId = e.pointerId;
+      try {
+        canvas.setPointerCapture(e.pointerId);
+      } catch (err) {
+        // Fallback for browsers with restricted capture
+      }
+
+      // Record undo checkpoint
+      pushUndoState();
+
+      // Read Stylus Pressure (e.pressure is 0.0 to 1.0)
+      const initialPressure = e.pressure !== undefined && e.pressure > 0 ? e.pressure : 0.5;
+      updatePressureHud(e.pointerType, initialPressure);
+
+      // Handle Lasso Tool
+      if (state.activeTool === 'lasso') {
+        state.lassoPolygon = [pagePos];
+        renderCurrentPage();
+        return;
+      }
+
+      // Handle Shape Tool
+      if (state.activeTool === 'shape') {
+        activeStroke = {
+          tool: 'shape',
+          isShape: true,
+          shapeType: state.activeShape,
+          color: state.strokeColor,
+          size: state.strokeSize,
+          points: [pagePos, pagePos]
+        };
+        renderCurrentPage();
+        return;
+      }
+
+      // Setup Inking Stroke
+      activeStroke = {
+        tool: state.activeTool,
+        isShape: false,
+        color: state.activeTool === 'highlighter' ? state.strokeColor : state.strokeColor,
+        size: state.activeTool === 'highlighter' ? Math.max(16, state.strokeSize * 4) : state.strokeSize,
+        points: [{
+          x: pagePos.x,
+          y: pagePos.y,
+          pressure: initialPressure,
+          time: Date.now()
+        }]
+      };
+
+      renderCurrentPage();
+    });
+
+    // Pointer Move Event with Coalesced Events support
+    viewport.addEventListener('pointermove', (e) => {
+      // Handle Multi-Touch Pinch Zoom and Pan
+      if (e.pointerType === 'touch' && activeTouches.has(e.pointerId)) {
+        activeTouches.set(e.pointerId, e);
+
+        if (activeTouches.size === 2) {
+          const [t1, t2] = Array.from(activeTouches.values());
+          const currentDistance = getPinchDistance(t1, t2);
+          const currentMidpoint = getTouchMidpoint(t1, t2);
+
+          if (initialPinchDistance > 0) {
+            const scaleChange = currentDistance / initialPinchDistance;
+            const newZoom = Math.min(Math.max(initialPinchZoom * scaleChange, 0.4), 4.0);
+            
+            state.panX = initialPan.x + (currentMidpoint.x - gestureCenter.x);
+            state.panY = initialPan.y + (currentMidpoint.y - gestureCenter.y);
+            state.zoom = newZoom;
+            updateCanvasTransform();
+          }
+          return;
+        }
+
+        if (state.pencilOnlyMode) {
+          return;
+        }
+      }
+
+      if (!isDrawing || e.pointerId !== activePointerId) return;
+
+      // Extract Coalesced events if provided by the device (sub-frame 240Hz stylus polling)
+      const events = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+
+      for (const ev of events) {
+        const pagePos = screenToPage(ev.clientX, ev.clientY);
+        const pressure = ev.pressure !== undefined && ev.pressure > 0 ? ev.pressure : 0.5;
+        updatePressureHud(ev.pointerType, pressure);
+
+        if (state.activeTool === 'lasso') {
+          state.lassoPolygon.push(pagePos);
+          continue;
+        }
+
+        if (state.activeTool === 'shape') {
+          if (activeStroke) {
+            activeStroke.points[1] = pagePos;
+          }
+          continue;
+        }
+
+        if (state.activeTool === 'eraser') {
+          // Object-level or pixel erase
+          performEraserCheck(pagePos, state.strokeSize * 4);
+          continue;
+        }
+
+        if (activeStroke) {
+          activeStroke.points.push({
+            x: pagePos.x,
+            y: pagePos.y,
+            pressure: pressure,
+            time: Date.now()
+          });
+        }
+      }
+
+      renderCurrentPage();
+    });
+
+    // Pointer Up & Cancel Events
+    function handlePointerEnd(e) {
+      if (e.pointerType === 'touch') {
+        activeTouches.delete(e.pointerId);
+        if (activeTouches.size < 2) {
+          initialPinchDistance = 0;
+        }
+      }
+
+      if (e.pointerId !== activePointerId) return;
+
+      if (isDrawing) {
+        if (state.activeTool === 'lasso') {
+          finalizeLasso();
+        } else if (activeStroke && activeStroke.points.length > 0) {
+          // Commit stroke to current page
+          const currentPage = state.pages[state.currentPageIndex];
+          currentPage.strokes.push(activeStroke);
+          activeStroke = null;
+          scheduleAutoSave();
+        }
+
+        isDrawing = false;
+        activePointerId = null;
+        try {
+          canvas.releasePointerCapture(e.pointerId);
+        } catch (err) {}
+
+        hidePressureHud();
+        renderCurrentPage();
+      }
+    }
+
+    viewport.addEventListener('pointerup', handlePointerEnd);
+    viewport.addEventListener('pointercancel', handlePointerEnd);
+
+    // Eraser helper: removes strokes that intersect with the eraser tip
+    function performEraserCheck(pos, radius) {
+      const currentPage = state.pages[state.currentPageIndex];
+      const prevLength = currentPage.strokes.length;
+
+      // Filter out strokes that intersect with eraser point
+      currentPage.strokes = currentPage.strokes.filter(stroke => {
+        return !stroke.points.some(pt => {
+          return Math.hypot(pt.x - pos.x, pt.y - pos.y) <= radius;
+        });
+      });
+
+      if (currentPage.strokes.length !== prevLength) {
+        scheduleAutoSave();
+      }
+    }
+
+    // Lasso Tool: Select and highlight strokes inside drawn loop
+    function finalizeLasso() {
+      if (state.lassoPolygon.length < 3) {
+        state.lassoPolygon = [];
+        return;
+      }
+
+      showToast(`Selected loop created with ${state.lassoPolygon.length} bounds`);
+      // Keep polygon visible briefly then fade
+      setTimeout(() => {
+        state.lassoPolygon = [];
+        renderCurrentPage();
+      }, 1500);
+    }
+
+    /* ==========================================================================
+       Stylus Pressure HUD & Visual Feedback
+       ========================================================================== */
+    function updatePressureHud(pointerType, pressure) {
+      livePressureHud.classList.remove('opacity-0');
+      hudPointerType.textContent = pointerType === 'pen' ? 'Apple Pencil' : 'Touch';
+      hudPressureBar.style.width = `${Math.min(100, Math.round(pressure * 100))}%`;
+      hudPressureVal.textContent = pressure.toFixed(2);
+    }
+
+    function hidePressureHud() {
+      setTimeout(() => {
+        if (!isDrawing) {
+          livePressureHud.classList.add('opacity-0');
+        }
+      }, 400);
+    }
+
+    let toastTimeout = null;
+    function showGestureToast(msg) {
+      gestureToast.textContent = msg;
+      gestureToast.classList.remove('opacity-0', '-translate-y-2');
+      clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(() => {
+        gestureToast.classList.add('opacity-0', '-translate-y-2');
+      }, 2000);
+    }
+
+    function showToast(msg) {
+      toast.textContent = msg;
+      toast.classList.remove('opacity-0', 'translate-y-2');
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-2');
+      }, 2200);
+    }
+
+    /* ==========================================================================
+       Undo / Redo History & Debounced Auto-Saving
+       ========================================================================== */
+    function pushUndoState() {
+      const page = state.pages[state.currentPageIndex];
+      // Clone strokes deep snapshot
+      const snapshot = JSON.parse(JSON.stringify(page.strokes));
+      state.undoStack.push(snapshot);
+      // Limit undo stack depth to 40 for optimal memory
+      if (state.undoStack.length > 40) {
+        state.undoStack.shift();
+      }
+      // Reset redo on new interaction
+      state.redoStack = [];
+      btnUndo.disabled = false;
+      btnRedo.disabled = true;
+    }
+
+    function performUndo() {
+      if (state.undoStack.length === 0) return;
+      const page = state.pages[state.currentPageIndex];
+      state.redoStack.push(JSON.parse(JSON.stringify(page.strokes)));
+      page.strokes = state.undoStack.pop();
+      renderCurrentPage();
+      scheduleAutoSave();
+    }
+
+    function performRedo() {
+      if (state.redoStack.length === 0) return;
+      const page = state.pages[state.currentPageIndex];
+      state.undoStack.push(JSON.parse(JSON.stringify(page.strokes)));
+      page.strokes = state.redoStack.pop();
+      renderCurrentPage();
+      scheduleAutoSave();
+    }
+
+    btnUndo.addEventListener('click', performUndo);
+    btnRedo.addEventListener('click', performRedo);
+
+    // Keyboard Shortcuts (Cmd+Z, Cmd+Shift+Z)
+    window.addEventListener('keydown', (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          performRedo();
+        } else {
+          performUndo();
+        }
+      }
+    });
+
+    // Debounced AutoSave with visual status badge
+    let autoSaveTimer = null;
+    function scheduleAutoSave() {
+      saveBadge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-amber-500 mr-1 animate-ping"></span> Saving...`;
+      saveBadge.className = 'inline-flex items-center text-[10px] font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300';
+
+      clearTimeout(autoSaveTimer);
+      autoSaveTimer = setTimeout(async () => {
+        try {
+          await storage.saveDoc({
+            id: state.docId,
+            title: state.title,
+            pages: state.pages,
+            updatedAt: Date.now()
+          });
+          saveBadge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1"></span> Saved`;
+          saveBadge.className = 'inline-flex items-center text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400';
+          updatePageThumbnails();
+        } catch (err) {
+          saveBadge.textContent = 'Save error';
+        }
+      }, 700);
+    }
+
+    /* ==========================================================================
+       Toolbar & Tool State Interactions
+       ========================================================================== */
+    toolBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tool = btn.dataset.tool;
+        state.activeTool = tool;
+
+        toolBtns.forEach(b => {
+          b.classList.remove('bg-white', 'dark:bg-slate-700', 'shadow-md');
+          b.querySelector('.tool-indicator')?.classList.add('hidden');
+        });
+
+        btn.classList.add('bg-white', 'dark:bg-slate-700', 'shadow-md');
+        btn.querySelector('.tool-indicator')?.classList.remove('hidden');
+
+        // Toggle shape configuration options
+        if (tool === 'shape') {
+          shapeOptionsBox.classList.remove('hidden');
+          shapeOptionsBox.classList.add('flex');
+          sizePopover.classList.remove('hidden');
+          sizePopover.classList.add('flex');
+        } else {
+          shapeOptionsBox.classList.add('hidden');
+          shapeOptionsBox.classList.remove('flex');
+        }
+      });
+    });
+
+    // Color Presets Selection
+    colorPresetBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        colorPresetBtns.forEach(b => b.classList.remove('ring-2', 'ring-blue-500'));
+        btn.classList.add('ring-2', 'ring-blue-500');
+        state.strokeColor = btn.dataset.color;
+        sizePreviewDot.style.backgroundColor = state.strokeColor;
+      });
+    });
+
+    // Custom Color Input
+    customColorInput.addEventListener('input', (e) => {
+      state.strokeColor = e.target.value;
+      sizePreviewDot.style.backgroundColor = state.strokeColor;
+      colorPresetBtns.forEach(b => b.classList.remove('ring-2', 'ring-blue-500'));
+    });
+
+    // Stroke Size Slider & Popover
+    btnSizeSettings.addEventListener('click', (e) => {
+      e.stopPropagation();
+      sizePopover.classList.toggle('hidden');
+      sizePopover.classList.toggle('flex');
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!sizePopover.contains(e.target) && !btnSizeSettings.contains(e.target)) {
+        sizePopover.classList.add('hidden');
+        sizePopover.classList.remove('flex');
+      }
+    });
+
+    strokeSlider.addEventListener('input', (e) => {
+      const val = parseFloat(e.target.value);
+      state.strokeSize = val;
+      strokeSizeLabel.textContent = `${val}px`;
+      popoverSizeText.textContent = `${val} px`;
+      sizePreviewDot.style.transform = `scale(${Math.min(2.0, Math.max(0.6, val / 4))})`;
+    });
+
+    document.querySelectorAll('.size-preset-pill').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const sz = parseFloat(btn.dataset.size);
+        state.strokeSize = sz;
+        strokeSlider.value = sz;
+        strokeSizeLabel.textContent = `${sz}px`;
+        popoverSizeText.textContent = `${sz} px`;
+        sizePreviewDot.style.transform = `scale(${Math.min(2.0, Math.max(0.6, sz / 4))})`;
+      });
+    });
+
+    // Shape Type Selection
+    shapeTypeBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        shapeTypeBtns.forEach(b => b.classList.remove('bg-blue-600', 'text-white'));
+        btn.classList.add('bg-blue-600', 'text-white');
+        state.activeShape = btn.dataset.shape;
+      });
+    });
+
+    /* ==========================================================================
+       Paper Template Switcher & Tint Controls
+       ========================================================================== */
+    btnPaperTemplate.addEventListener('click', () => {
+      paperModal.classList.remove('hidden');
+      paperModal.classList.add('flex');
+    });
+
+    btnClosePaperModal.addEventListener('click', () => {
+      paperModal.classList.add('hidden');
+      paperModal.classList.remove('flex');
+    });
+
+    paperCards.forEach(card => {
+      card.addEventListener('click', () => {
+        paperCards.forEach(c => {
+          c.classList.remove('border-blue-500', 'bg-blue-50/50', 'dark:bg-blue-950/30');
+          c.classList.add('border-transparent');
+        });
+        card.classList.add('border-blue-500', 'bg-blue-50/50', 'dark:bg-blue-950/30');
+        card.classList.remove('border-transparent');
+
+        const paperType = card.dataset.paper;
+        state.pages[state.currentPageIndex].paper = paperType;
+        renderCurrentPage();
+        scheduleAutoSave();
+      });
+    });
+
+    tintBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        tintBtns.forEach(b => b.classList.remove('ring-2', 'ring-blue-500'));
+        btn.classList.add('ring-2', 'ring-blue-500');
+
+        const tint = btn.dataset.tint;
+        state.pages[state.currentPageIndex].tint = tint;
+        renderCurrentPage();
+        scheduleAutoSave();
+      });
+    });
+
+    // Pencil Only Mode Toggle
+    btnToggleStylus.addEventListener('click', () => {
+      state.pencilOnlyMode = !state.pencilOnlyMode;
+      if (state.pencilOnlyMode) {
+        btnToggleStylus.className = 'flex items-center space-x-1 px-2.5 py-1 rounded-xl text-xs font-medium transition-all bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-500/20';
+        stylusModeLabel.textContent = 'Pencil Only';
+        showToast('Pencil Only: Single finger will not draw accidentally');
+      } else {
+        btnToggleStylus.className = 'flex items-center space-x-1 px-2.5 py-1 rounded-xl text-xs font-medium transition-all bg-slate-300 dark:bg-slate-700 text-slate-800 dark:text-slate-200';
+        stylusModeLabel.textContent = 'Touch Draw';
+        showToast('Touch Draw enabled: Finger drawing turned on');
+      }
+    });
+
+    // Zoom Reset Button
+    btnZoomReset.addEventListener('click', () => {
+      state.zoom = 1.0;
+      state.panX = 0;
+      state.panY = 0;
+      updateCanvasTransform();
+    });
+
+    /* ==========================================================================
+       Multi-Page Notebook Drawer & Page Management
+       ========================================================================== */
+    btnTogglePages.addEventListener('click', () => {
+      pagesDrawer.classList.toggle('-translate-x-full');
+      updatePageThumbnails();
+    });
+
+    btnClosePagesDrawer.addEventListener('click', () => {
+      pagesDrawer.classList.add('-translate-x-full');
+    });
+
+    btnAddPage.addEventListener('click', () => {
+      const newPageId = `page_${Date.now()}`;
+      const previousPage = state.pages[state.currentPageIndex];
+
+      state.pages.push({
+        id: newPageId,
+        paper: previousPage ? previousPage.paper : 'grid',
+        tint: previousPage ? previousPage.tint : 'white',
+        strokes: []
+      });
+
+      state.currentPageIndex = state.pages.length - 1;
+      state.undoStack = [];
+      state.redoStack = [];
+
+      updatePageIndicator();
+      updatePageThumbnails();
+      renderCurrentPage();
+      scheduleAutoSave();
+      showToast(`Added Page ${state.pages.length}`);
+    });
+
+    btnClearCurrentPage.addEventListener('click', () => {
+      pushUndoState();
+      state.pages[state.currentPageIndex].strokes = [];
+      renderCurrentPage();
+      scheduleAutoSave();
+      showToast('Cleared active page');
+    });
+
+    function updatePageIndicator() {
+      currentPageIndicator.textContent = `Page ${state.currentPageIndex + 1} of ${state.pages.length}`;
+      drawerDocSummary.textContent = `${state.pages.length} Pages Total`;
+    }
+
+    function updatePageThumbnails() {
+      pagesList.innerHTML = '';
+
+      state.pages.forEach((page, index) => {
+        const item = document.createElement('div');
+        const isActive = index === state.currentPageIndex;
+
+        item.className = `p-3 rounded-2xl border-2 cursor-pointer transition-all flex items-center justify-between ${
+          isActive 
+            ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-950/30 shadow-md' 
+            : 'border-black/5 dark:border-white/5 hover:border-slate-300 dark:hover:border-zinc-700 bg-white/40 dark:bg-zinc-800/40'
+        }`;
+
+        item.innerHTML = `
+          <div class="flex items-center space-x-3">
+            <div class="w-10 h-14 rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-sm flex items-center justify-center text-[10px] font-mono text-slate-400">
+              #${index + 1}
+            </div>
+            <div>
+              <div class="text-sm font-semibold">Page ${index + 1}</div>
+              <div class="text-xs text-slate-400 capitalize">${page.paper} • ${page.strokes.length} strokes</div>
+            </div>
+          </div>
+          ${state.pages.length > 1 ? `
+            <button class="btn-delete-page p-1.5 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40" data-index="${index}" title="Delete Page">
+              <i data-lucide="trash" class="w-4 h-4"></i>
+            </button>
+          ` : ''}
+        `;
+
+        item.addEventListener('click', (e) => {
+          if (e.target.closest('.btn-delete-page')) return;
+          state.currentPageIndex = index;
+          state.undoStack = [];
+          state.redoStack = [];
+          updatePageIndicator();
+          renderCurrentPage();
+          pagesDrawer.classList.add('-translate-x-full');
+        });
+
+        pagesList.appendChild(item);
+      });
+
+      // Attach delete page listeners
+      document.querySelectorAll('.btn-delete-page').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const delIndex = parseInt(btn.dataset.index, 10);
+          if (state.pages.length <= 1) return;
+
+          state.pages.splice(delIndex, 1);
+          if (state.currentPageIndex >= state.pages.length) {
+            state.currentPageIndex = state.pages.length - 1;
+          }
+          updatePageIndicator();
+          updatePageThumbnails();
+          renderCurrentPage();
+          scheduleAutoSave();
+          showToast('Page deleted');
+        });
+      });
+
+      lucide.createIcons();
+    }
+
+    /* ==========================================================================
+       Export (High-Res Retina PNG, JSON Document Backup & Restore)
+       ========================================================================== */
+    btnExportModal.addEventListener('click', () => {
+      exportModal.classList.remove('hidden');
+      exportModal.classList.add('flex');
+    });
+
+    btnCloseExportModal.addEventListener('click', () => {
+      exportModal.classList.add('hidden');
+      exportModal.classList.remove('flex');
+    });
+
+    // Export High-Res PNG
+    btnExportPng.addEventListener('click', () => {
+      const dataUrl = canvas.toDataURL('image/png', 1.0);
+      const link = document.createElement('a');
+      link.download = `${state.title.replace(/\s+/g, '_')}_Page_${state.currentPageIndex + 1}.png`;
+      link.href = dataUrl;
+      link.click();
+      exportModal.classList.add('hidden');
+      exportModal.classList.remove('flex');
+      showToast('Exported High-Res PNG');
+    });
+
+    // Export Vector JSON Backup
+    btnExportJson.addEventListener('click', () => {
+      const docData = {
+        title: state.title,
+        pages: state.pages,
+        exportedAt: new Date().toISOString()
+      };
+      const jsonStr = JSON.stringify(docData, null, 2);
+      const blob = new Blob([jsonStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.download = `${state.title.replace(/\s+/g, '_')}_Backup.json`;
+      link.href = url;
+      link.click();
+      URL.revokeObjectURL(url);
+      exportModal.classList.add('hidden');
+      exportModal.classList.remove('flex');
+      showToast('Exported Note Document (.json)');
+    });
+
+    // Import Document JSON
+    importJsonInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = async (evt) => {
+        try {
+          const parsed = JSON.parse(evt.target.result);
+          if (parsed.pages && Array.isArray(parsed.pages)) {
+            state.title = parsed.title || 'Restored Note';
+            state.pages = parsed.pages;
+            state.currentPageIndex = 0;
+            state.undoStack = [];
+            state.redoStack = [];
+
+            noteTitleInput.value = state.title;
+            updatePageIndicator();
+            updatePageThumbnails();
+            renderCurrentPage();
+            scheduleAutoSave();
+
+            exportModal.classList.add('hidden');
+            exportModal.classList.remove('flex');
+            showToast('Document restored successfully!');
+          }
+        } catch (err) {
+          showToast('Failed to parse backup file');
+        }
+      };
+      reader.readAsText(file);
+    });
+
+    /* ==========================================================================
+       Dark Mode, Document Title, and Startup Lifecycle
+       ========================================================================== */
+    const btnToggleDark = document.getElementById('btn-toggle-dark');
+    btnToggleDark.addEventListener('click', () => {
+      document.documentElement.classList.toggle('dark');
+      renderCurrentPage();
+    });
+
+    noteTitleInput.addEventListener('change', () => {
+      state.title = noteTitleInput.value.trim() || 'Untitled Note';
+      scheduleAutoSave();
+    });
+
+    window.addEventListener('resize', () => {
+      updateCanvasTransform();
+      renderCurrentPage();
+    });
+
+    // App Startup Bootstrapper
+    window.addEventListener('DOMContentLoaded', async () => {
+      // Initialize Lucide icons
+      lucide.createIcons();
+
+      // Load saved state from IndexedDB
+      try {
+        await storage.init();
+        const saved = await storage.loadDoc(state.docId);
+        if (saved) {
+          state.title = saved.title || state.title;
+          state.pages = saved.pages && saved.pages.length > 0 ? saved.pages : state.pages;
+          noteTitleInput.value = state.title;
+        }
+      } catch (err) {
+        console.warn('Using fresh session memory');
+      }
+
+      resizeCanvas();
+      updatePageIndicator();
+      updatePageThumbnails();
+
+      // Ensure active tool visually selected
+      const defaultToolBtn = document.querySelector('[data-tool="fountain"]');
+      if (defaultToolBtn) {
+        defaultToolBtn.classList.add('bg-white', 'dark:bg-slate-700', 'shadow-md');
+        defaultToolBtn.querySelector('.tool-indicator')?.classList.remove('hidden');
+      }
+    });
+  </script>
+</body>
+</html>
