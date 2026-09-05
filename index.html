@@ -48,12 +48,16 @@
       width: 100%;
       height: 100%;
       overflow: hidden;
-      touch-action: none;
       -webkit-touch-callout: none;
       -webkit-user-select: none;
       user-select: none;
       overscroll-behavior: none;
       background-color: #f1f5f9;
+    }
+
+    #view-homescreen main {
+      touch-action: pan-y;
+      -webkit-overflow-scrolling: touch;
     }
 
     .dark body {
@@ -185,10 +189,10 @@
   <!-- ========================================================================
        VIEW 2: NOTEBOOK EDITOR / CANVAS & INKING
        ======================================================================== -->
-  <section id="view-editor" class="absolute inset-0 z-20 flex flex-col bg-slate-200 dark:bg-zinc-900 pointer-events-none opacity-0 transition-opacity duration-300">
+  <section id="view-editor" class="absolute inset-0 z-20 flex-col bg-slate-200 dark:bg-zinc-900 hidden">
     
     <!-- Top Editor Bar -->
-    <header class="h-14 w-full z-30 px-3 sm:px-5 flex items-center justify-between glass-panel border-b border-black/5 dark:border-white/10 shrink-0 pointer-events-auto">
+    <header class="h-14 w-full z-30 px-3 sm:px-5 flex items-center justify-between glass-panel border-b border-black/5 dark:border-white/10 shrink-0">
       <!-- Left: Back to Home + Document Title + Pages Drawer Trigger -->
       <div class="flex items-center space-x-2 sm:space-x-3">
         <button id="btn-back-to-home" class="p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 active:scale-95 transition-all text-slate-700 dark:text-slate-200 flex items-center space-x-1" title="Back to All Notebooks">
@@ -255,7 +259,7 @@
     </header>
 
     <!-- Main Drawing Viewport -->
-    <main class="flex-1 relative w-full h-full overflow-hidden bg-slate-200 dark:bg-zinc-900 select-none cursor-crosshair pointer-events-auto" id="viewport-container">
+    <main class="flex-1 relative w-full h-full overflow-hidden bg-slate-200 dark:bg-zinc-900 select-none cursor-crosshair" id="viewport-container">
       
       <!-- High DPI Canvas Transform Container -->
       <div id="canvas-wrapper" class="absolute inset-0 w-full h-full flex items-center justify-center pointer-events-none">
@@ -281,7 +285,7 @@
     </main>
 
     <!-- Floating Inking Toolbar Dock -->
-    <div id="floating-toolbar" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-30 glass-panel rounded-3xl p-2 px-3 flex items-center space-x-2 sm:space-x-3 shadow-2xl border border-white/60 dark:border-white/10 transition-all duration-200 pointer-events-auto">
+    <div id="floating-toolbar" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-30 glass-panel rounded-3xl p-2 px-3 flex items-center space-x-2 sm:space-x-3 shadow-2xl border border-white/60 dark:border-white/10 transition-all duration-200">
       
       <!-- Instruments Group -->
       <div class="flex items-center space-x-1 bg-black/5 dark:bg-white/5 p-1 rounded-2xl">
@@ -1011,13 +1015,18 @@
       updatePageIndicator();
       updatePageThumbnails();
 
-      // Smooth View Swap
-      viewHomescreen.classList.add('pointer-events-none', 'opacity-0');
-      viewEditor.classList.remove('pointer-events-none', 'opacity-0');
+      // Clean view toggle: hide homescreen, show editor
+      viewHomescreen.classList.add('hidden');
+      viewHomescreen.classList.remove('flex');
+      viewEditor.classList.remove('hidden');
+      viewEditor.classList.add('flex');
       appState.currentView = 'editor';
 
-      resizeCanvas();
-      renderCurrentPage();
+      // Schedule canvas sizing after view is rendered
+      requestAnimationFrame(() => {
+        resizeCanvas();
+        renderCurrentPage();
+      });
     }
 
     async function returnToHomescreen() {
@@ -1026,8 +1035,11 @@
         await dbService.saveNotebook(appState.activeNotebook);
       }
 
-      viewEditor.classList.add('pointer-events-none', 'opacity-0');
-      viewHomescreen.classList.remove('pointer-events-none', 'opacity-0');
+      // Clean view toggle: hide editor, restore homescreen
+      viewEditor.classList.add('hidden');
+      viewEditor.classList.remove('flex');
+      viewHomescreen.classList.remove('hidden');
+      viewHomescreen.classList.add('flex');
       appState.currentView = 'homescreen';
       appState.activeNotebook = null;
 
