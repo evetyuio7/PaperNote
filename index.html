@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>StylusNotes Studio - iPad & Stylus Pro Notebook</title>
+  <title>StylusNotes Studio - iPad Notebook Library & Inking</title>
   
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -14,7 +14,7 @@
   <!-- Google Fonts: Inter & JetBrains Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 
   <script>
     tailwind.config = {
@@ -22,7 +22,7 @@
       theme: {
         extend: {
           fontFamily: {
-            sans: ['Inter', 'sans-serif'],
+            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
             mono: ['JetBrains Mono', 'monospace'],
           },
           colors: {
@@ -41,7 +41,7 @@
   </script>
 
   <style>
-    /* Absolute touch-action isolation to stop iOS rubber-banding and default gestures */
+    /* Absolute touch-action isolation to prevent iOS rubber-banding & browser gestures */
     html, body {
       margin: 0;
       padding: 0;
@@ -53,10 +53,14 @@
       -webkit-user-select: none;
       user-select: none;
       overscroll-behavior: none;
-      background-color: #e5e5ea;
+      background-color: #f1f5f9;
     }
 
-    /* Hardware accelerated rendering */
+    .dark body {
+      background-color: #0f172a;
+    }
+
+    /* Hardware accelerated smooth canvas */
     canvas {
       display: block;
       touch-action: none;
@@ -68,275 +72,402 @@
     /* Glassmorphism utility */
     .glass-panel {
       background: rgba(255, 255, 255, 0.88);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      border: 1px solid rgba(255, 255, 255, 0.4);
-      box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.05);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border: 1px solid rgba(255, 255, 255, 0.5);
+      box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.03);
     }
     .dark .glass-panel {
-      background: rgba(30, 30, 34, 0.85);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
+      background: rgba(24, 24, 27, 0.85);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
       border: 1px solid rgba(255, 255, 255, 0.08);
       box-shadow: 0 12px 35px -5px rgba(0, 0, 0, 0.5);
     }
 
-    /* Tooltip styling */
-    .tooltip-hint {
-      pointer-events: none;
-      opacity: 0;
-      transition: opacity 0.15s ease;
+    /* Notebook 3D cover styling */
+    .notebook-cover-card {
+      transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s ease;
     }
-    .has-tooltip:hover .tooltip-hint {
-      opacity: 1;
+    .notebook-cover-card:hover {
+      transform: translateY(-6px) scale(1.02);
+      box-shadow: 0 20px 35px -10px rgba(0, 0, 0, 0.22);
     }
 
-    /* Custom scrollbar for drawer */
+    /* Notebook Spine Effect */
+    .notebook-spine {
+      background: linear-gradient(90deg, rgba(0,0,0,0.22) 0%, rgba(255,255,255,0.15) 30%, rgba(0,0,0,0.1) 100%);
+    }
+
+    /* Custom scrollbars */
     ::-webkit-scrollbar {
-      width: 5px;
-      height: 5px;
+      width: 6px;
+      height: 6px;
     }
     ::-webkit-scrollbar-thumb {
-      background: rgba(150, 150, 150, 0.4);
+      background: rgba(148, 163, 184, 0.4);
       border-radius: 9999px;
+    }
+    .dark ::-webkit-scrollbar-thumb {
+      background: rgba(100, 116, 139, 0.5);
     }
   </style>
 </head>
 
 <body class="h-full w-full text-slate-800 dark:text-slate-100 flex flex-col relative font-sans overflow-hidden">
 
-  <!-- Top App Navigation & Quick Status -->
-  <header class="h-14 w-full z-30 px-3 sm:px-5 flex items-center justify-between glass-panel border-b border-black/5 dark:border-white/10 shrink-0">
-    <!-- Left: Document details & Drawer toggle -->
-    <div class="flex items-center space-x-2 sm:space-x-3">
-      <button id="btn-toggle-pages" class="p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 active:scale-95 transition-all text-slate-700 dark:text-slate-200" title="Pages & Notebook">
-        <i data-lucide="book-open" class="w-5 h-5"></i>
-      </button>
-
-      <div class="flex flex-col">
-        <div class="flex items-center space-x-2">
-          <input id="note-title-input" type="text" value="iPad Note 1" class="bg-transparent font-semibold text-sm sm:text-base border-b border-transparent hover:border-slate-300 dark:hover:border-slate-600 focus:border-blue-500 focus:outline-none px-1 rounded-sm transition-all max-w-[130px] sm:max-w-[240px] truncate" />
-          <span id="save-status-badge" class="inline-flex items-center text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400">
-            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1 animate-pulse"></span>
-            Saved
-          </span>
+  <!-- ========================================================================
+       VIEW 1: HOMESCREEN / NOTEBOOK LIBRARY DASHBOARD
+       ======================================================================== -->
+  <section id="view-homescreen" class="absolute inset-0 z-10 flex flex-col bg-slate-100/90 dark:bg-zinc-950 overflow-hidden transition-opacity duration-300">
+    <!-- Homescreen Top Header -->
+    <header class="h-16 w-full px-6 sm:px-8 flex items-center justify-between glass-panel border-b border-black/5 dark:border-white/10 shrink-0 z-10">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center text-white shadow-md shadow-blue-500/20">
+          <i data-lucide="book-open-check" class="w-5 h-5"></i>
         </div>
-        <span class="text-[10px] text-slate-400 px-1" id="current-page-indicator">Page 1 of 1</span>
-      </div>
-    </div>
-
-    <!-- Center: Quick Undo / Redo & Mode toggles -->
-    <div class="flex items-center space-x-1 sm:space-x-2 bg-slate-200/60 dark:bg-slate-800/80 p-1 rounded-2xl">
-      <button id="btn-undo" class="p-2 rounded-xl hover:bg-white dark:hover:bg-slate-700 active:scale-95 transition-all text-slate-700 dark:text-slate-200 disabled:opacity-30 disabled:pointer-events-none" title="Undo (Cmd+Z)">
-        <i data-lucide="undo-2" class="w-4 h-4"></i>
-      </button>
-      <button id="btn-redo" class="p-2 rounded-xl hover:bg-white dark:hover:bg-slate-700 active:scale-95 transition-all text-slate-700 dark:text-slate-200 disabled:opacity-30 disabled:pointer-events-none" title="Redo (Cmd+Shift+Z)">
-        <i data-lucide="redo-2" class="w-4 h-4"></i>
-      </button>
-      <div class="w-px h-4 bg-slate-300 dark:bg-slate-700 mx-1"></div>
-      
-      <!-- Zoom Reset Button -->
-      <button id="btn-zoom-reset" class="px-2.5 py-1 text-xs font-mono font-medium rounded-lg hover:bg-white dark:hover:bg-slate-700 active:scale-95 transition-all text-slate-700 dark:text-slate-200" title="Reset Zoom to 100%">
-        100%
-      </button>
-
-      <!-- Stylus / Finger Toggle -->
-      <button id="btn-toggle-stylus-mode" class="flex items-center space-x-1 px-2.5 py-1 rounded-xl text-xs font-medium transition-all bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-500/20" title="Apple Pencil Only Mode (Palm Rejection)">
-        <i data-lucide="pen-tool" class="w-3.5 h-3.5"></i>
-        <span class="hidden md:inline" id="stylus-mode-label">Pencil Only</span>
-      </button>
-    </div>
-
-    <!-- Right: Paper Setup, Dark Mode & Export -->
-    <div class="flex items-center space-x-1.5 sm:space-x-2">
-      <!-- Paper Template Picker Trigger -->
-      <button id="btn-paper-template" class="p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 active:scale-95 transition-all text-slate-700 dark:text-slate-200 flex items-center space-x-1" title="Change Paper Style">
-        <i data-lucide="grid-3x3" class="w-5 h-5"></i>
-        <span class="hidden lg:inline text-xs font-medium">Paper</span>
-      </button>
-
-      <!-- Export Menu Trigger -->
-      <button id="btn-export-modal" class="p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 active:scale-95 transition-all text-slate-700 dark:text-slate-200" title="Export & Share">
-        <i data-lucide="share" class="w-5 h-5"></i>
-      </button>
-
-      <!-- Dark Mode Toggle -->
-      <button id="btn-toggle-dark" class="p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 active:scale-95 transition-all text-slate-700 dark:text-slate-200" title="Toggle Theme">
-        <i data-lucide="moon" class="w-5 h-5 dark:hidden"></i>
-        <i data-lucide="sun" class="w-5 h-5 hidden dark:block"></i>
-      </button>
-    </div>
-  </header>
-
-  <!-- Main Canvas Viewport Area -->
-  <main class="flex-1 relative w-full h-full overflow-hidden bg-slate-200 dark:bg-zinc-900 select-none cursor-crosshair" id="viewport-container">
-    
-    <!-- Coordinate / Paper Page Display Container with exact standard page aspect ratio & bounds -->
-    <div id="canvas-wrapper" class="absolute inset-0 w-full h-full flex items-center justify-center pointer-events-none">
-      <!-- Active drawing canvas layer -->
-      <canvas id="note-canvas" class="pointer-events-auto shadow-2xl transition-shadow duration-300"></canvas>
-    </div>
-
-    <!-- Live Floating Apple Pencil Info Overlay (Shows instantaneous pressure and tip radius) -->
-    <div id="live-pressure-hud" class="absolute bottom-4 left-4 z-20 pointer-events-none opacity-0 transition-opacity duration-200 flex items-center space-x-2.5 px-3 py-1.5 rounded-full glass-panel text-[11px] font-mono">
-      <div class="flex items-center space-x-1.5">
-        <span class="w-2 h-2 rounded-full bg-blue-500"></span>
-        <span id="hud-pointer-type">Stylus</span>
-      </div>
-      <div class="w-16 bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
-        <div id="hud-pressure-bar" class="h-full bg-blue-500 rounded-full transition-all duration-75" style="width: 0%"></div>
-      </div>
-      <span id="hud-pressure-val">0.00</span>
-    </div>
-
-    <!-- Floating Gesture & Palm Rejection Indicator -->
-    <div id="gesture-toast" class="absolute top-4 left-1/2 -translate-x-1/2 z-20 pointer-events-none opacity-0 transition-all duration-300 transform -translate-y-2 px-3 py-1.5 rounded-full glass-panel text-xs font-medium text-slate-700 dark:text-slate-200 shadow-md">
-      Pencil only mode active: Finger pan/zoom enabled
-    </div>
-  </main>
-
-  <!-- Floating Tool Palette (GoodNotes / Apple Notes inspired dock) -->
-  <div id="floating-toolbar" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-30 glass-panel rounded-3xl p-2 px-3 flex items-center space-x-2 sm:space-x-3 shadow-2xl border border-white/60 dark:border-white/10 transition-all duration-200">
-    
-    <!-- Drawing Instruments Group -->
-    <div class="flex items-center space-x-1 bg-black/5 dark:bg-white/5 p-1 rounded-2xl">
-      <!-- Fountain / Pressure Pen -->
-      <button data-tool="fountain" class="tool-btn relative p-2.5 rounded-xl hover:bg-white dark:hover:bg-slate-700 active:scale-95 transition-all text-slate-700 dark:text-slate-200 active-tool" title="Fountain Pen (Dynamic Pressure)">
-        <i data-lucide="feather" class="w-5 h-5"></i>
-        <span class="w-1 h-1 rounded-full bg-blue-500 absolute bottom-1 left-1/2 -translate-x-1/2 tool-indicator"></span>
-      </button>
-
-      <!-- Monoline / Ballpoint Pen -->
-      <button data-tool="monoline" class="tool-btn relative p-2.5 rounded-xl hover:bg-white dark:hover:bg-slate-700 active:scale-95 transition-all text-slate-700 dark:text-slate-200" title="Ballpoint / Monoline (Even line)">
-        <i data-lucide="pen" class="w-5 h-5"></i>
-        <span class="w-1 h-1 rounded-full bg-blue-500 absolute bottom-1 left-1/2 -translate-x-1/2 tool-indicator hidden"></span>
-      </button>
-
-      <!-- Highlighter -->
-      <button data-tool="highlighter" class="tool-btn relative p-2.5 rounded-xl hover:bg-white dark:hover:bg-slate-700 active:scale-95 transition-all text-slate-700 dark:text-slate-200" title="Highlighter (Multiply layer)">
-        <i data-lucide="highlighter" class="w-5 h-5"></i>
-        <span class="w-1 h-1 rounded-full bg-blue-500 absolute bottom-1 left-1/2 -translate-x-1/2 tool-indicator hidden"></span>
-      </button>
-
-      <!-- Eraser with options -->
-      <button data-tool="eraser" class="tool-btn relative p-2.5 rounded-xl hover:bg-white dark:hover:bg-slate-700 active:scale-95 transition-all text-slate-700 dark:text-slate-200" title="Eraser (Pixel & Stroke erase)">
-        <i data-lucide="eraser" class="w-5 h-5"></i>
-        <span class="w-1 h-1 rounded-full bg-blue-500 absolute bottom-1 left-1/2 -translate-x-1/2 tool-indicator hidden"></span>
-      </button>
-
-      <!-- Geometric Shapes Tool -->
-      <button data-tool="shape" class="tool-btn relative p-2.5 rounded-xl hover:bg-white dark:hover:bg-slate-700 active:scale-95 transition-all text-slate-700 dark:text-slate-200" title="Geometric Shapes & Auto-Detect">
-        <i data-lucide="shapes" class="w-5 h-5"></i>
-        <span class="w-1 h-1 rounded-full bg-blue-500 absolute bottom-1 left-1/2 -translate-x-1/2 tool-indicator hidden"></span>
-      </button>
-
-      <!-- Lasso / Select Tool -->
-      <button data-tool="lasso" class="tool-btn relative p-2.5 rounded-xl hover:bg-white dark:hover:bg-slate-700 active:scale-95 transition-all text-slate-700 dark:text-slate-200" title="Lasso Selection (Move & transform)">
-        <i data-lucide="lasso" class="w-5 h-5"></i>
-        <span class="w-1 h-1 rounded-full bg-blue-500 absolute bottom-1 left-1/2 -translate-x-1/2 tool-indicator hidden"></span>
-      </button>
-    </div>
-
-    <!-- Divider -->
-    <div class="w-px h-6 bg-slate-300 dark:bg-slate-700"></div>
-
-    <!-- Primary Color Swatches & Color Wheel -->
-    <div class="flex items-center space-x-1 sm:space-x-1.5">
-      <button class="color-preset-btn w-6 h-6 rounded-full border-2 border-white dark:border-slate-800 shadow-sm transition-transform active:scale-90 ring-2 ring-blue-500" data-color="#1e293b" style="background-color: #1e293b;"></button>
-      <button class="color-preset-btn w-6 h-6 rounded-full border-2 border-white dark:border-slate-800 shadow-sm transition-transform active:scale-90" data-color="#2563eb" style="background-color: #2563eb;"></button>
-      <button class="color-preset-btn w-6 h-6 rounded-full border-2 border-white dark:border-slate-800 shadow-sm transition-transform active:scale-90" data-color="#dc2626" style="background-color: #dc2626;"></button>
-      <button class="color-preset-btn w-6 h-6 rounded-full border-2 border-white dark:border-slate-800 shadow-sm transition-transform active:scale-90" data-color="#16a34a" style="background-color: #16a34a;"></button>
-      <button class="color-preset-btn w-6 h-6 rounded-full border-2 border-white dark:border-slate-800 shadow-sm transition-transform active:scale-90" data-color="#f59e0b" style="background-color: #f59e0b;"></button>
-      
-      <!-- Custom Color Picker Input -->
-      <label class="relative w-6 h-6 rounded-full overflow-hidden border-2 border-white dark:border-slate-800 shadow-sm cursor-pointer active:scale-90 transition-transform">
-        <input id="custom-color-input" type="color" value="#1e293b" class="absolute -top-4 -left-4 w-14 h-14 cursor-pointer" />
-        <div class="w-full h-full bg-gradient-to-tr from-pink-500 via-amber-400 to-blue-500"></div>
-      </label>
-    </div>
-
-    <!-- Divider -->
-    <div class="w-px h-6 bg-slate-300 dark:bg-slate-700 hidden sm:block"></div>
-
-    <!-- Stroke Width Presets & Slider Trigger -->
-    <div class="flex items-center space-x-1">
-      <button id="btn-size-settings" class="flex items-center space-x-1 px-2.5 py-1.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 text-xs font-semibold font-mono text-slate-700 dark:text-slate-200 transition-all">
-        <div id="size-preview-dot" class="w-2.5 h-2.5 rounded-full bg-slate-800 dark:bg-white mr-1"></div>
-        <span id="stroke-size-label">3px</span>
-        <i data-lucide="chevron-up" class="w-3.5 h-3.5"></i>
-      </button>
-    </div>
-
-    <!-- Expandable Mini Popover for Stroke Width -->
-    <div id="size-popover" class="hidden absolute bottom-16 left-1/2 -translate-x-1/2 glass-panel p-4 rounded-2xl shadow-xl w-64 border border-white/60 dark:border-white/10 flex-col space-y-3">
-      <div class="flex justify-between items-center text-xs font-medium">
-        <span>Stroke Thickness</span>
-        <span id="popover-size-text" class="font-mono text-blue-600 dark:text-blue-400">3 px</span>
-      </div>
-      <input id="stroke-slider" type="range" min="1" max="40" value="3" class="w-full accent-blue-500 cursor-pointer" />
-      <div class="grid grid-cols-4 gap-2 pt-1">
-        <button class="size-preset-pill py-1 rounded-lg text-xs bg-black/5 dark:bg-white/10 hover:bg-blue-500 hover:text-white transition-all font-mono" data-size="1.5">Fine</button>
-        <button class="size-preset-pill py-1 rounded-lg text-xs bg-black/5 dark:bg-white/10 hover:bg-blue-500 hover:text-white transition-all font-mono" data-size="3">Medium</button>
-        <button class="size-preset-pill py-1 rounded-lg text-xs bg-black/5 dark:bg-white/10 hover:bg-blue-500 hover:text-white transition-all font-mono" data-size="8">Thick</button>
-        <button class="size-preset-pill py-1 rounded-lg text-xs bg-black/5 dark:bg-white/10 hover:bg-blue-500 hover:text-white transition-all font-mono" data-size="24">Marker</button>
-      </div>
-
-      <!-- Shape Tool Options (shown when shape tool is active) -->
-      <div id="shape-options-box" class="pt-2 border-t border-slate-200 dark:border-slate-700 hidden flex-col space-y-2">
-        <span class="text-xs font-medium text-slate-500">Shape Type</span>
-        <div class="grid grid-cols-4 gap-1.5 text-xs">
-          <button data-shape="line" class="shape-type-btn p-1.5 rounded-lg bg-black/5 dark:bg-white/10 hover:bg-blue-500 hover:text-white text-center">Line</button>
-          <button data-shape="arrow" class="shape-type-btn p-1.5 rounded-lg bg-black/5 dark:bg-white/10 hover:bg-blue-500 hover:text-white text-center">Arrow</button>
-          <button data-shape="rect" class="shape-type-btn p-1.5 rounded-lg bg-black/5 dark:bg-white/10 hover:bg-blue-500 hover:text-white text-center">Box</button>
-          <button data-shape="ellipse" class="shape-type-btn p-1.5 rounded-lg bg-black/5 dark:bg-white/10 hover:bg-blue-500 hover:text-white text-center">Circle</button>
+        <div>
+          <h1 class="font-bold text-lg leading-tight tracking-tight">StylusNotes Studio</h1>
+          <p class="text-xs text-slate-400 font-medium">iPad & Pencil Notebooks</p>
         </div>
+      </div>
+
+      <!-- Search & Actions -->
+      <div class="flex items-center space-x-2 sm:space-x-3">
+        <!-- Search Notebooks Input -->
+        <div class="relative hidden sm:block w-48 md:w-64">
+          <i data-lucide="search" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+          <input id="notebook-search-input" type="text" placeholder="Search notebooks..." 
+                 class="w-full pl-9 pr-4 py-1.5 text-xs rounded-xl bg-black/5 dark:bg-white/5 border border-transparent focus:border-blue-500 focus:bg-white dark:focus:bg-zinc-800 outline-none transition-all" />
+        </div>
+
+        <!-- Import JSON Backup -->
+        <label class="p-2.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 active:scale-95 transition-all text-slate-600 dark:text-slate-300 cursor-pointer" title="Import Notebook (.json)">
+          <i data-lucide="upload" class="w-5 h-5"></i>
+          <input type="file" id="import-notebook-file" accept=".json" class="hidden" />
+        </label>
+
+        <!-- Dark Mode Toggle -->
+        <button id="btn-home-toggle-dark" class="p-2.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 active:scale-95 transition-all text-slate-600 dark:text-slate-300" title="Toggle Theme">
+          <i data-lucide="moon" class="w-5 h-5 dark:hidden"></i>
+          <i data-lucide="sun" class="w-5 h-5 hidden dark:block"></i>
+        </button>
+
+        <!-- New Notebook Button -->
+        <button id="btn-open-create-modal" class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs sm:text-sm flex items-center space-x-2 shadow-lg shadow-blue-500/25 active:scale-95 transition-all">
+          <i data-lucide="plus" class="w-4 h-4"></i>
+          <span>New Notebook</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Homescreen Body / Grid of Notebooks -->
+    <main class="flex-1 overflow-y-auto p-6 sm:p-8 space-y-6">
+      <!-- Quick Summary Banner -->
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-black/5 dark:border-white/10">
+        <div>
+          <h2 class="text-xl sm:text-2xl font-bold tracking-tight">Your Bookshelf</h2>
+          <p class="text-xs sm:text-sm text-slate-500 dark:text-slate-400">Select a notebook to resume sketching, writing, or studying with Apple Pencil.</p>
+        </div>
+        <div class="flex items-center space-x-2 text-xs text-slate-500 font-medium">
+          <span id="library-count-badge">0 Notebooks</span>
+        </div>
+      </div>
+
+      <!-- Grid of Notebook Cards -->
+      <div id="notebooks-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-5 sm:gap-6 pt-2">
+        <!-- Dynamically rendered notebook cards -->
+      </div>
+    </main>
+  </section>
+
+
+  <!-- ========================================================================
+       VIEW 2: NOTEBOOK EDITOR / CANVAS & INKING
+       ======================================================================== -->
+  <section id="view-editor" class="absolute inset-0 z-20 flex flex-col bg-slate-200 dark:bg-zinc-900 pointer-events-none opacity-0 transition-opacity duration-300">
+    
+    <!-- Top Editor Bar -->
+    <header class="h-14 w-full z-30 px-3 sm:px-5 flex items-center justify-between glass-panel border-b border-black/5 dark:border-white/10 shrink-0 pointer-events-auto">
+      <!-- Left: Back to Home + Document Title + Pages Drawer Trigger -->
+      <div class="flex items-center space-x-2 sm:space-x-3">
+        <button id="btn-back-to-home" class="p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 active:scale-95 transition-all text-slate-700 dark:text-slate-200 flex items-center space-x-1" title="Back to All Notebooks">
+          <i data-lucide="chevron-left" class="w-5 h-5"></i>
+          <span class="text-xs font-semibold hidden md:inline">Library</span>
+        </button>
+
+        <div class="h-5 w-px bg-slate-300 dark:bg-slate-700 mx-0.5"></div>
+
+        <button id="btn-toggle-pages" class="p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 active:scale-95 transition-all text-slate-700 dark:text-slate-200" title="Notebook Pages List">
+          <i data-lucide="book-open" class="w-5 h-5"></i>
+        </button>
+
+        <div class="flex flex-col">
+          <div class="flex items-center space-x-2">
+            <input id="note-title-input" type="text" value="Untitled" class="bg-transparent font-semibold text-sm sm:text-base border-b border-transparent hover:border-slate-300 dark:hover:border-slate-600 focus:border-blue-500 focus:outline-none px-1 rounded-sm transition-all max-w-[120px] sm:max-w-[200px] truncate" />
+            <span id="save-status-badge" class="inline-flex items-center text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1 animate-pulse"></span>
+              Saved
+            </span>
+          </div>
+          <span class="text-[10px] text-slate-400 px-1" id="current-page-indicator">Page 1 of 1</span>
+        </div>
+      </div>
+
+      <!-- Center: Quick Undo / Redo & Zoom Controls -->
+      <div class="flex items-center space-x-1 sm:space-x-2 bg-slate-200/60 dark:bg-slate-800/80 p-1 rounded-2xl">
+        <button id="btn-undo" class="p-2 rounded-xl hover:bg-white dark:hover:bg-slate-700 active:scale-95 transition-all text-slate-700 dark:text-slate-200 disabled:opacity-30 disabled:pointer-events-none" title="Undo (Cmd+Z)">
+          <i data-lucide="undo-2" class="w-4 h-4"></i>
+        </button>
+        <button id="btn-redo" class="p-2 rounded-xl hover:bg-white dark:hover:bg-slate-700 active:scale-95 transition-all text-slate-700 dark:text-slate-200 disabled:opacity-30 disabled:pointer-events-none" title="Redo (Cmd+Shift+Z)">
+          <i data-lucide="redo-2" class="w-4 h-4"></i>
+        </button>
+        <div class="w-px h-4 bg-slate-300 dark:bg-slate-700 mx-1"></div>
+        
+        <!-- Zoom Reset Button -->
+        <button id="btn-zoom-reset" class="px-2.5 py-1 text-xs font-mono font-medium rounded-lg hover:bg-white dark:hover:bg-slate-700 active:scale-95 transition-all text-slate-700 dark:text-slate-200" title="Reset Zoom to 100%">
+          100%
+        </button>
+
+        <!-- Apple Pencil Only Mode Toggle -->
+        <button id="btn-toggle-stylus-mode" class="flex items-center space-x-1 px-2.5 py-1 rounded-xl text-xs font-medium transition-all bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-500/20" title="Apple Pencil Only Mode (Palm Rejection)">
+          <i data-lucide="pen-tool" class="w-3.5 h-3.5"></i>
+          <span class="hidden md:inline" id="stylus-mode-label">Pencil Only</span>
+        </button>
+      </div>
+
+      <!-- Right: Paper Template, Export & Theme -->
+      <div class="flex items-center space-x-1.5 sm:space-x-2">
+        <button id="btn-paper-template" class="p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 active:scale-95 transition-all text-slate-700 dark:text-slate-200 flex items-center space-x-1" title="Change Paper Grid Alignment">
+          <i data-lucide="grid-3x3" class="w-5 h-5"></i>
+          <span class="hidden lg:inline text-xs font-medium">Paper</span>
+        </button>
+
+        <button id="btn-export-modal" class="p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 active:scale-95 transition-all text-slate-700 dark:text-slate-200" title="Export & Backup">
+          <i data-lucide="share" class="w-5 h-5"></i>
+        </button>
+
+        <button id="btn-editor-toggle-dark" class="p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 active:scale-95 transition-all text-slate-700 dark:text-slate-200" title="Toggle Theme">
+          <i data-lucide="moon" class="w-5 h-5 dark:hidden"></i>
+          <i data-lucide="sun" class="w-5 h-5 hidden dark:block"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Drawing Viewport -->
+    <main class="flex-1 relative w-full h-full overflow-hidden bg-slate-200 dark:bg-zinc-900 select-none cursor-crosshair pointer-events-auto" id="viewport-container">
+      
+      <!-- High DPI Canvas Transform Container -->
+      <div id="canvas-wrapper" class="absolute inset-0 w-full h-full flex items-center justify-center pointer-events-none">
+        <canvas id="note-canvas" class="pointer-events-auto shadow-2xl transition-shadow duration-300"></canvas>
+      </div>
+
+      <!-- Live Floating Apple Pencil Pressure HUD -->
+      <div id="live-pressure-hud" class="absolute bottom-4 left-4 z-20 pointer-events-none opacity-0 transition-opacity duration-200 flex items-center space-x-2.5 px-3 py-1.5 rounded-full glass-panel text-[11px] font-mono">
+        <div class="flex items-center space-x-1.5">
+          <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+          <span id="hud-pointer-type">Stylus</span>
+        </div>
+        <div class="w-16 bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
+          <div id="hud-pressure-bar" class="h-full bg-blue-500 rounded-full transition-all duration-75" style="width: 0%"></div>
+        </div>
+        <span id="hud-pressure-val">0.00</span>
+      </div>
+
+      <!-- Palm Rejection & Gesture Toast Notification -->
+      <div id="gesture-toast" class="absolute top-4 left-1/2 -translate-x-1/2 z-20 pointer-events-none opacity-0 transition-all duration-300 transform -translate-y-2 px-3.5 py-1.5 rounded-full glass-panel text-xs font-medium text-slate-700 dark:text-slate-200 shadow-md">
+        Pencil Only: 2 fingers to zoom or scroll
+      </div>
+    </main>
+
+    <!-- Floating Inking Toolbar Dock -->
+    <div id="floating-toolbar" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-30 glass-panel rounded-3xl p-2 px-3 flex items-center space-x-2 sm:space-x-3 shadow-2xl border border-white/60 dark:border-white/10 transition-all duration-200 pointer-events-auto">
+      
+      <!-- Instruments Group -->
+      <div class="flex items-center space-x-1 bg-black/5 dark:bg-white/5 p-1 rounded-2xl">
+        <!-- Fountain Pen -->
+        <button data-tool="fountain" class="tool-btn relative p-2.5 rounded-xl hover:bg-white dark:hover:bg-slate-700 active:scale-95 transition-all text-slate-700 dark:text-slate-200 active-tool" title="Fountain Pen (Pressure dynamics)">
+          <i data-lucide="feather" class="w-5 h-5"></i>
+          <span class="w-1 h-1 rounded-full bg-blue-500 absolute bottom-1 left-1/2 -translate-x-1/2 tool-indicator"></span>
+        </button>
+
+        <!-- Monoline / Ballpoint -->
+        <button data-tool="monoline" class="tool-btn relative p-2.5 rounded-xl hover:bg-white dark:hover:bg-slate-700 active:scale-95 transition-all text-slate-700 dark:text-slate-200" title="Monoline / Ballpoint (Uniform line)">
+          <i data-lucide="pen" class="w-5 h-5"></i>
+          <span class="w-1 h-1 rounded-full bg-blue-500 absolute bottom-1 left-1/2 -translate-x-1/2 tool-indicator hidden"></span>
+        </button>
+
+        <!-- Highlighter -->
+        <button data-tool="highlighter" class="tool-btn relative p-2.5 rounded-xl hover:bg-white dark:hover:bg-slate-700 active:scale-95 transition-all text-slate-700 dark:text-slate-200" title="Highlighter (Multiply blend)">
+          <i data-lucide="highlighter" class="w-5 h-5"></i>
+          <span class="w-1 h-1 rounded-full bg-blue-500 absolute bottom-1 left-1/2 -translate-x-1/2 tool-indicator hidden"></span>
+        </button>
+
+        <!-- Eraser -->
+        <button data-tool="eraser" class="tool-btn relative p-2.5 rounded-xl hover:bg-white dark:hover:bg-slate-700 active:scale-95 transition-all text-slate-700 dark:text-slate-200" title="Precision Eraser">
+          <i data-lucide="eraser" class="w-5 h-5"></i>
+          <span class="w-1 h-1 rounded-full bg-blue-500 absolute bottom-1 left-1/2 -translate-x-1/2 tool-indicator hidden"></span>
+        </button>
+
+        <!-- Geometric Shapes -->
+        <button data-tool="shape" class="tool-btn relative p-2.5 rounded-xl hover:bg-white dark:hover:bg-slate-700 active:scale-95 transition-all text-slate-700 dark:text-slate-200" title="Geometric Shapes (Lines, Arrows, Box, Circle)">
+          <i data-lucide="shapes" class="w-5 h-5"></i>
+          <span class="w-1 h-1 rounded-full bg-blue-500 absolute bottom-1 left-1/2 -translate-x-1/2 tool-indicator hidden"></span>
+        </button>
+
+        <!-- Lasso Selection -->
+        <button data-tool="lasso" class="tool-btn relative p-2.5 rounded-xl hover:bg-white dark:hover:bg-slate-700 active:scale-95 transition-all text-slate-700 dark:text-slate-200" title="Lasso Tool">
+          <i data-lucide="lasso" class="w-5 h-5"></i>
+          <span class="w-1 h-1 rounded-full bg-blue-500 absolute bottom-1 left-1/2 -translate-x-1/2 tool-indicator hidden"></span>
+        </button>
+      </div>
+
+      <div class="w-px h-6 bg-slate-300 dark:bg-slate-700"></div>
+
+      <!-- Color Swatches & Picker -->
+      <div class="flex items-center space-x-1 sm:space-x-1.5">
+        <button class="color-preset-btn w-6 h-6 rounded-full border-2 border-white dark:border-slate-800 shadow-sm transition-transform active:scale-90 ring-2 ring-blue-500" data-color="#1e293b" style="background-color: #1e293b;"></button>
+        <button class="color-preset-btn w-6 h-6 rounded-full border-2 border-white dark:border-slate-800 shadow-sm transition-transform active:scale-90" data-color="#2563eb" style="background-color: #2563eb;"></button>
+        <button class="color-preset-btn w-6 h-6 rounded-full border-2 border-white dark:border-slate-800 shadow-sm transition-transform active:scale-90" data-color="#dc2626" style="background-color: #dc2626;"></button>
+        <button class="color-preset-btn w-6 h-6 rounded-full border-2 border-white dark:border-slate-800 shadow-sm transition-transform active:scale-90" data-color="#16a34a" style="background-color: #16a34a;"></button>
+        <button class="color-preset-btn w-6 h-6 rounded-full border-2 border-white dark:border-slate-800 shadow-sm transition-transform active:scale-90" data-color="#f59e0b" style="background-color: #f59e0b;"></button>
+        
+        <!-- Custom Color Picker -->
+        <label class="relative w-6 h-6 rounded-full overflow-hidden border-2 border-white dark:border-slate-800 shadow-sm cursor-pointer active:scale-90 transition-transform">
+          <input id="custom-color-input" type="color" value="#1e293b" class="absolute -top-4 -left-4 w-14 h-14 cursor-pointer" />
+          <div class="w-full h-full bg-gradient-to-tr from-pink-500 via-amber-400 to-blue-500"></div>
+        </label>
+      </div>
+
+      <div class="w-px h-6 bg-slate-300 dark:bg-slate-700 hidden sm:block"></div>
+
+      <!-- Stroke Thickness Popover Trigger -->
+      <div class="flex items-center space-x-1">
+        <button id="btn-size-settings" class="flex items-center space-x-1 px-2.5 py-1.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 text-xs font-semibold font-mono text-slate-700 dark:text-slate-200 transition-all">
+          <div id="size-preview-dot" class="w-2.5 h-2.5 rounded-full bg-slate-800 dark:bg-white mr-1"></div>
+          <span id="stroke-size-label">3px</span>
+          <i data-lucide="chevron-up" class="w-3.5 h-3.5"></i>
+        </button>
+      </div>
+
+      <!-- Stroke Width & Shape Sub-Options Popover -->
+      <div id="size-popover" class="hidden absolute bottom-16 left-1/2 -translate-x-1/2 glass-panel p-4 rounded-2xl shadow-xl w-64 border border-white/60 dark:border-white/10 flex-col space-y-3 pointer-events-auto">
+        <div class="flex justify-between items-center text-xs font-medium">
+          <span>Stroke Width</span>
+          <span id="popover-size-text" class="font-mono text-blue-600 dark:text-blue-400">3 px</span>
+        </div>
+        <input id="stroke-slider" type="range" min="1" max="40" value="3" class="w-full accent-blue-500 cursor-pointer" />
+        <div class="grid grid-cols-4 gap-2 pt-1">
+          <button class="size-preset-pill py-1 rounded-lg text-xs bg-black/5 dark:bg-white/10 hover:bg-blue-500 hover:text-white transition-all font-mono" data-size="1.5">Fine</button>
+          <button class="size-preset-pill py-1 rounded-lg text-xs bg-black/5 dark:bg-white/10 hover:bg-blue-500 hover:text-white transition-all font-mono" data-size="3">Medium</button>
+          <button class="size-preset-pill py-1 rounded-lg text-xs bg-black/5 dark:bg-white/10 hover:bg-blue-500 hover:text-white transition-all font-mono" data-size="8">Thick</button>
+          <button class="size-preset-pill py-1 rounded-lg text-xs bg-black/5 dark:bg-white/10 hover:bg-blue-500 hover:text-white transition-all font-mono" data-size="24">Marker</button>
+        </div>
+
+        <!-- Shape Tool Selection Options -->
+        <div id="shape-options-box" class="pt-2 border-t border-slate-200 dark:border-slate-700 hidden flex-col space-y-2">
+          <span class="text-xs font-medium text-slate-500">Geometric Shape</span>
+          <div class="grid grid-cols-4 gap-1.5 text-xs">
+            <button data-shape="line" class="shape-type-btn p-1.5 rounded-lg bg-blue-600 text-white hover:bg-blue-500 text-center font-medium">Line</button>
+            <button data-shape="arrow" class="shape-type-btn p-1.5 rounded-lg bg-black/5 dark:bg-white/10 hover:bg-blue-500 hover:text-white text-center font-medium">Arrow</button>
+            <button data-shape="rect" class="shape-type-btn p-1.5 rounded-lg bg-black/5 dark:bg-white/10 hover:bg-blue-500 hover:text-white text-center font-medium">Box</button>
+            <button data-shape="ellipse" class="shape-type-btn p-1.5 rounded-lg bg-black/5 dark:bg-white/10 hover:bg-blue-500 hover:text-white text-center font-medium">Circle</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================================================================
+       MODAL 1: CREATE NEW NOTEBOOK MODAL
+       ======================================================================== -->
+  <div id="create-notebook-modal" class="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="glass-panel w-full max-w-md rounded-3xl p-6 shadow-2xl border border-white/40 dark:border-white/10 space-y-5">
+      <div class="flex items-center justify-between pb-3 border-b border-black/5 dark:border-white/10">
+        <div>
+          <h3 class="text-lg font-bold">New Notebook</h3>
+          <p class="text-xs text-slate-400">Choose a title, cover color, and default paper ruling</p>
+        </div>
+        <button id="btn-close-create-modal" class="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-slate-400">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="space-y-4">
+        <div>
+          <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1.5">Notebook Title</label>
+          <input id="create-nb-title" type="text" placeholder="e.g. Physics & Math Notes" class="w-full px-4 py-2.5 rounded-xl bg-black/5 dark:bg-white/5 border border-slate-200 dark:border-zinc-700 focus:border-blue-500 outline-none text-sm font-medium" />
+        </div>
+
+        <div>
+          <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1.5">Cover Color</label>
+          <div class="flex items-center space-x-2.5" id="cover-color-selector">
+            <button type="button" class="cover-color-opt w-8 h-8 rounded-xl bg-blue-600 ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-zinc-900 shadow-sm" data-color="#2563eb"></button>
+            <button type="button" class="cover-color-opt w-8 h-8 rounded-xl bg-indigo-700 shadow-sm" data-color="#4338ca"></button>
+            <button type="button" class="cover-color-opt w-8 h-8 rounded-xl bg-emerald-700 shadow-sm" data-color="#047857"></button>
+            <button type="button" class="cover-color-opt w-8 h-8 rounded-xl bg-amber-600 shadow-sm" data-color="#d97706"></button>
+            <button type="button" class="cover-color-opt w-8 h-8 rounded-xl bg-rose-700 shadow-sm" data-color="#be123c"></button>
+            <button type="button" class="cover-color-opt w-8 h-8 rounded-xl bg-slate-800 shadow-sm" data-color="#1e293b"></button>
+          </div>
+        </div>
+
+        <div>
+          <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1.5">Default Paper Rule</label>
+          <div class="grid grid-cols-3 gap-2 text-xs">
+            <button type="button" class="create-paper-choice p-2 rounded-xl border border-blue-500 bg-blue-50 dark:bg-blue-950/40 font-medium text-center" data-paper="graph">Square Grid</button>
+            <button type="button" class="create-paper-choice p-2 rounded-xl border border-slate-200 dark:border-zinc-700 hover:border-slate-400 font-medium text-center" data-paper="lined">Ruled Lines</button>
+            <button type="button" class="create-paper-choice p-2 rounded-xl border border-slate-200 dark:border-zinc-700 hover:border-slate-400 font-medium text-center" data-paper="dotted">Dotted</button>
+            <button type="button" class="create-paper-choice p-2 rounded-xl border border-slate-200 dark:border-zinc-700 hover:border-slate-400 font-medium text-center" data-paper="cornell">Cornell</button>
+            <button type="button" class="create-paper-choice p-2 rounded-xl border border-slate-200 dark:border-zinc-700 hover:border-slate-400 font-medium text-center" data-paper="isometric">Isometric</button>
+            <button type="button" class="create-paper-choice p-2 rounded-xl border border-slate-200 dark:border-zinc-700 hover:border-slate-400 font-medium text-center" data-paper="blank">Blank</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="pt-2 flex items-center justify-end space-x-2">
+        <button id="btn-cancel-create" class="px-4 py-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 text-xs font-semibold">Cancel</button>
+        <button id="btn-confirm-create" class="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-md shadow-blue-500/20 active:scale-95 transition-all">Create Notebook</button>
       </div>
     </div>
   </div>
 
-  <!-- Paper Template & Canvas Settings Modal -->
+
+  <!-- ========================================================================
+       MODAL 2: PAPER TEMPLATE & CANVAS SETTINGS MODAL
+       ======================================================================== -->
   <div id="paper-modal" class="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm hidden items-center justify-center p-4">
     <div class="glass-panel w-full max-w-lg rounded-3xl p-6 shadow-2xl border border-white/40 dark:border-white/10 space-y-5 animate-in fade-in zoom-in duration-200">
       <div class="flex items-center justify-between pb-3 border-b border-black/5 dark:border-white/10">
         <div>
-          <h2 class="text-lg font-bold">Paper Style & Grid</h2>
-          <p class="text-xs text-slate-500 dark:text-slate-400">Choose exact ruling alignments for notes, math, and sketching</p>
+          <h2 class="text-lg font-bold">Paper Style & Ruling</h2>
+          <p class="text-xs text-slate-500 dark:text-slate-400">Select precise rulings for sketches, geometry, and handwriting</p>
         </div>
-        <button id="btn-close-paper-modal" class="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-slate-400 hover:text-slate-700 dark:hover:text-white">
+        <button id="btn-close-paper-modal" class="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-slate-400">
           <i data-lucide="x" class="w-5 h-5"></i>
         </button>
       </div>
 
       <!-- Paper Grid Choice Grid -->
       <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        <!-- Blank Paper -->
-        <button data-paper="blank" class="paper-card p-3 rounded-2xl border-2 border-blue-500 bg-blue-50/50 dark:bg-blue-950/30 text-left transition-all flex flex-col items-start space-y-2">
-          <div class="w-full h-16 rounded-lg bg-white dark:bg-zinc-800 shadow-inner border border-slate-200 dark:border-zinc-700 flex items-center justify-center">
-            <span class="text-[11px] text-slate-400">Plain</span>
+        <!-- Square Grid -->
+        <button data-paper="graph" class="paper-card p-3 rounded-2xl border-2 border-blue-500 bg-blue-50/50 dark:bg-blue-950/30 text-left transition-all flex flex-col items-start space-y-2">
+          <div class="w-full h-16 rounded-lg bg-white dark:bg-zinc-800 shadow-inner border border-slate-200 dark:border-zinc-700 relative overflow-hidden" style="background-image: linear-gradient(to right, rgba(100,116,139,0.25) 1px, transparent 1px), linear-gradient(to bottom, rgba(100,116,139,0.25) 1px, transparent 1px); background-size: 8px 8px;">
           </div>
-          <span class="text-xs font-semibold">Blank Paper</span>
+          <span class="text-xs font-semibold">Square Grid (5mm)</span>
         </button>
 
         <!-- Lined / Ruled Paper -->
         <button data-paper="lined" class="paper-card p-3 rounded-2xl border-2 border-transparent hover:border-slate-300 dark:hover:border-slate-700 bg-white/60 dark:bg-zinc-800/60 text-left transition-all flex flex-col items-start space-y-2">
           <div class="w-full h-16 rounded-lg bg-white dark:bg-zinc-800 shadow-inner border border-slate-200 dark:border-zinc-700 overflow-hidden relative">
-            <!-- Simulated lines -->
             <div class="absolute inset-0 flex flex-col justify-between py-2">
               <div class="w-full h-px bg-slate-300 dark:bg-zinc-600"></div>
               <div class="w-full h-px bg-slate-300 dark:bg-zinc-600"></div>
               <div class="w-full h-px bg-slate-300 dark:bg-zinc-600"></div>
               <div class="w-full h-px bg-slate-300 dark:bg-zinc-600"></div>
             </div>
-            <div class="absolute top-0 bottom-0 left-4 w-px bg-rose-300 dark:bg-rose-500/50"></div>
+            <div class="absolute top-0 bottom-0 left-4 w-px bg-rose-400"></div>
           </div>
           <span class="text-xs font-semibold">College Ruled</span>
-        </button>
-
-        <!-- Squared / Math Graph -->
-        <button data-paper="graph" class="paper-card p-3 rounded-2xl border-2 border-transparent hover:border-slate-300 dark:hover:border-slate-700 bg-white/60 dark:bg-zinc-800/60 text-left transition-all flex flex-col items-start space-y-2">
-          <div class="w-full h-16 rounded-lg bg-white dark:bg-zinc-800 shadow-inner border border-slate-200 dark:border-zinc-700 relative overflow-hidden" style="background-image: linear-gradient(to right, rgba(100,116,139,0.2) 1px, transparent 1px), linear-gradient(to bottom, rgba(100,116,139,0.2) 1px, transparent 1px); background-size: 8px 8px;">
-          </div>
-          <span class="text-xs font-semibold">Square Grid (5mm)</span>
         </button>
 
         <!-- Dotted Bullet Journal -->
@@ -351,9 +482,9 @@
           <div class="w-full h-16 rounded-lg bg-white dark:bg-zinc-800 shadow-inner border border-slate-200 dark:border-zinc-700 relative">
             <div class="absolute top-0 bottom-4 left-6 w-px bg-slate-300 dark:bg-zinc-600"></div>
             <div class="absolute bottom-4 left-0 right-0 h-px bg-slate-300 dark:bg-zinc-600"></div>
-            <span class="text-[9px] text-slate-400 absolute bottom-0.5 left-2">Summary</span>
+            <span class="text-[9px] text-slate-400 absolute bottom-0.5 left-2 font-mono">Summary</span>
           </div>
-          <span class="text-xs font-semibold">Cornell Method</span>
+          <span class="text-xs font-semibold">Cornell Notes</span>
         </button>
 
         <!-- Isometric Grid -->
@@ -362,6 +493,14 @@
             <i data-lucide="box" class="w-6 h-6 text-slate-400"></i>
           </div>
           <span class="text-xs font-semibold">Isometric (3D)</span>
+        </button>
+
+        <!-- Blank Paper -->
+        <button data-paper="blank" class="paper-card p-3 rounded-2xl border-2 border-transparent hover:border-slate-300 dark:hover:border-slate-700 bg-white/60 dark:bg-zinc-800/60 text-left transition-all flex flex-col items-start space-y-2">
+          <div class="w-full h-16 rounded-lg bg-white dark:bg-zinc-800 shadow-inner border border-slate-200 dark:border-zinc-700 flex items-center justify-center">
+            <span class="text-[11px] text-slate-400">Blank</span>
+          </div>
+          <span class="text-xs font-semibold">Blank Sketch</span>
         </button>
       </div>
 
@@ -377,7 +516,9 @@
     </div>
   </div>
 
-  <!-- Slide-out Pages Drawer & Notebook Manager -->
+  <!-- ========================================================================
+       SLIDE-OUT PAGES DRAWER
+       ======================================================================== -->
   <div id="pages-drawer" class="fixed top-0 left-0 bottom-0 w-80 z-40 glass-panel -translate-x-full transition-transform duration-300 flex flex-col shadow-2xl border-r border-black/10 dark:border-white/10">
     <div class="p-4 border-b border-black/5 dark:border-white/10 flex items-center justify-between">
       <div>
@@ -389,12 +530,10 @@
       </button>
     </div>
 
-    <!-- Pages List Container -->
-    <div id="pages-list" class="flex-1 overflow-y-auto p-4 space-y-3">
-      <!-- Dynamically generated page thumbnails -->
-    </div>
+    <!-- Pages List Thumbnails Container -->
+    <div id="pages-list" class="flex-1 overflow-y-auto p-4 space-y-3"></div>
 
-    <!-- Bottom Actions: Add Page & Clear Canvas -->
+    <!-- Bottom Actions -->
     <div class="p-4 border-t border-black/5 dark:border-white/10 space-y-2 bg-black/[0.02] dark:bg-white/[0.02]">
       <button id="btn-add-page" class="w-full py-2.5 px-4 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm flex items-center justify-center space-x-2 shadow-lg shadow-blue-500/20 active:scale-[0.98] transition-all">
         <i data-lucide="plus" class="w-4 h-4"></i>
@@ -408,11 +547,14 @@
     </div>
   </div>
 
-  <!-- Export & Cloud Backup Modal -->
+
+  <!-- ========================================================================
+       MODAL 3: EXPORT & BACKUP MODAL
+       ======================================================================== -->
   <div id="export-modal" class="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm hidden items-center justify-center p-4">
     <div class="glass-panel w-full max-w-md rounded-3xl p-6 shadow-2xl border border-white/40 dark:border-white/10 space-y-4">
       <div class="flex items-center justify-between pb-2 border-b border-black/5 dark:border-white/10">
-        <h3 class="font-bold text-base">Export Document</h3>
+        <h3 class="font-bold text-base">Export Active Notebook</h3>
         <button id="btn-close-export-modal" class="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10">
           <i data-lucide="x" class="w-5 h-5"></i>
         </button>
@@ -424,8 +566,8 @@
             <i data-lucide="image" class="w-5 h-5"></i>
           </div>
           <div class="flex-1">
-            <div class="text-sm font-semibold">High-Res PNG Image</div>
-            <div class="text-xs text-slate-400">Export active page at full iPad Retina 2x scale</div>
+            <div class="text-sm font-semibold">High-Res PNG Page</div>
+            <div class="text-xs text-slate-400">Export active page at Retina resolution</div>
           </div>
         </button>
 
@@ -434,40 +576,29 @@
             <i data-lucide="file-code" class="w-5 h-5"></i>
           </div>
           <div class="flex-1">
-            <div class="text-sm font-semibold">Vector Note Backup (.json)</div>
-            <div class="text-xs text-slate-400">Save vector strokes, pressure data, and all pages</div>
+            <div class="text-sm font-semibold">Notebook Backup (.json)</div>
+            <div class="text-xs text-slate-400">Export all vector strokes & pages</div>
           </div>
         </button>
-
-        <!-- Import JSON file -->
-        <label class="w-full p-3.5 rounded-2xl bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 hover:border-blue-500 flex items-center space-x-3 text-left transition-all group cursor-pointer">
-          <div class="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
-            <i data-lucide="upload" class="w-5 h-5"></i>
-          </div>
-          <div class="flex-1">
-            <div class="text-sm font-semibold">Import Backup File</div>
-            <div class="text-xs text-slate-400">Restore existing document from file</div>
-          </div>
-          <input type="file" id="import-json-input" accept=".json" class="hidden" />
-        </label>
       </div>
     </div>
   </div>
 
-  <!-- Custom Toast Notification Container -->
+
+  <!-- Floating Toast Notification -->
   <div id="toast" class="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 pointer-events-none opacity-0 transition-all duration-300 transform translate-y-2 glass-panel px-4 py-2 rounded-full text-xs font-semibold shadow-xl border border-white/40 dark:border-white/10 text-slate-800 dark:text-slate-100">
     Notification
   </div>
 
   <script>
     /* ==========================================================================
-       IndexedDB & Document Persistence Architecture
+       IndexedDB Multi-Notebook Storage Engine
        ========================================================================== */
-    const DB_NAME = 'StylusNotesApp_DB';
-    const DB_VERSION = 1;
-    const STORE_NAME = 'notebooks';
+    const DB_NAME = 'StylusNotesApp_MultiNotebook_DB';
+    const DB_VERSION = 2;
+    const STORE_NOTEBOOKS = 'notebooks';
 
-    class StorageService {
+    class NotebookDatabase {
       constructor() {
         this.db = null;
       }
@@ -477,8 +608,9 @@
           const request = indexedDB.open(DB_NAME, DB_VERSION);
           request.onupgradeneeded = (e) => {
             const db = e.target.result;
-            if (!db.objectStoreNames.contains(STORE_NAME)) {
-              db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+            if (!db.objectStoreNames.contains(STORE_NOTEBOOKS)) {
+              const store = db.createObjectStore(STORE_NOTEBOOKS, { keyPath: 'id' });
+              store.createIndex('updatedAt', 'updatedAt', { unique: false });
             }
           };
           request.onsuccess = (e) => {
@@ -489,63 +621,83 @@
         });
       }
 
-      async saveDoc(doc) {
+      async getAllNotebooks() {
         if (!this.db) await this.init();
         return new Promise((resolve, reject) => {
-          const tx = this.db.transaction(STORE_NAME, 'readwrite');
-          const store = tx.objectStore(STORE_NAME);
-          store.put(doc);
-          tx.oncomplete = () => resolve();
-          tx.onerror = (e) => reject(e);
+          const tx = this.db.transaction(STORE_NOTEBOOKS, 'readonly');
+          const store = tx.objectStore(STORE_NOTEBOOKS);
+          const request = store.getAll();
+          request.onsuccess = () => {
+            // Sort by most recently updated
+            const results = request.result || [];
+            results.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+            resolve(results);
+          };
+          request.onerror = (e) => reject(e);
         });
       }
 
-      async loadDoc(id) {
+      async getNotebook(id) {
         if (!this.db) await this.init();
         return new Promise((resolve, reject) => {
-          const tx = this.db.transaction(STORE_NAME, 'readonly');
-          const store = tx.objectStore(STORE_NAME);
+          const tx = this.db.transaction(STORE_NOTEBOOKS, 'readonly');
+          const store = tx.objectStore(STORE_NOTEBOOKS);
           const request = store.get(id);
           request.onsuccess = () => resolve(request.result);
           request.onerror = (e) => reject(e);
         });
       }
+
+      async saveNotebook(notebook) {
+        if (!this.db) await this.init();
+        return new Promise((resolve, reject) => {
+          const tx = this.db.transaction(STORE_NOTEBOOKS, 'readwrite');
+          const store = tx.objectStore(STORE_NOTEBOOKS);
+          notebook.updatedAt = Date.now();
+          store.put(notebook);
+          tx.oncomplete = () => resolve(notebook);
+          tx.onerror = (e) => reject(e);
+        });
+      }
+
+      async deleteNotebook(id) {
+        if (!this.db) await this.init();
+        return new Promise((resolve, reject) => {
+          const tx = this.db.transaction(STORE_NOTEBOOKS, 'readwrite');
+          const store = tx.objectStore(STORE_NOTEBOOKS);
+          store.delete(id);
+          tx.oncomplete = () => resolve();
+          tx.onerror = (e) => reject(e);
+        });
+      }
     }
 
-    const storage = new StorageService();
+    const dbService = new NotebookDatabase();
 
     /* ==========================================================================
-       Application State
+       Global Application State
        ========================================================================== */
-    const state = {
-      docId: 'default_note_1',
-      title: 'iPad Notes Pro',
-      pages: [
-        {
-          id: 'page_1',
-          paper: 'grid', // 'blank' | 'lined' | 'graph' | 'dotted' | 'cornell' | 'isometric'
-          tint: 'white',  // 'white' | 'cream' | 'dark'
-          strokes: []
-        }
-      ],
+    const appState = {
+      currentView: 'homescreen', // 'homescreen' | 'editor'
+      allNotebooks: [],
+      activeNotebook: null,
       currentPageIndex: 0,
-      
-      // Active tool configurations
+
+      // Tool configurations
       activeTool: 'fountain', // 'fountain' | 'monoline' | 'highlighter' | 'eraser' | 'shape' | 'lasso'
       strokeColor: '#1e293b',
       strokeSize: 3.0,
       activeShape: 'line', // 'line' | 'arrow' | 'rect' | 'ellipse'
-      
+
       // Hardware & Stylus settings
-      pencilOnlyMode: true, // If true, finger only zooms/pans; pen draws!
-      smoothingFactor: 0.85,
-      
-      // Viewport transform (Pan and Zoom)
+      pencilOnlyMode: true, // Apple Pencil draws; fingers pan/zoom
+
+      // Viewport Pan & Zoom
       zoom: 1.0,
       panX: 0,
       panY: 0,
 
-      // Undo / Redo stacks
+      // Undo / Redo history
       undoStack: [],
       redoStack: [],
 
@@ -554,19 +706,36 @@
       lassoPolygon: []
     };
 
-    // Logical page dimensions (standard A4 / iPad 4:3 high-res canvas: 1600 x 2133)
+    // Standard high-res iPad canvas logical dimensions (4:3 aspect ratio)
     const PAGE_WIDTH = 1600;
     const PAGE_HEIGHT = 2133;
-    const GRID_SPACING = 40; // Base millimeter grid alignment
+    const GRID_SPACING = 40; // 5mm equivalent grid unit
 
     /* ==========================================================================
        DOM Elements
        ========================================================================== */
+    const viewHomescreen = document.getElementById('view-homescreen');
+    const viewEditor = document.getElementById('view-editor');
+    const notebooksGrid = document.getElementById('notebooks-grid');
+    const libraryCountBadge = document.getElementById('library-count-badge');
+    const notebookSearchInput = document.getElementById('notebook-search-input');
+    const importNotebookFile = document.getElementById('import-notebook-file');
+
+    // Create Modal Elements
+    const createNotebookModal = document.getElementById('create-notebook-modal');
+    const btnOpenCreateModal = document.getElementById('btn-open-create-modal');
+    const btnCloseCreateModal = document.getElementById('btn-close-create-modal');
+    const btnCancelCreate = document.getElementById('btn-cancel-create');
+    const btnConfirmCreate = document.getElementById('btn-confirm-create');
+    const createNbTitle = document.getElementById('create-nb-title');
+    const coverColorOpts = document.querySelectorAll('.cover-color-opt');
+    const createPaperChoices = document.querySelectorAll('.create-paper-choice');
+
+    // Editor Header & Viewport Elements
+    const btnBackToHome = document.getElementById('btn-back-to-home');
     const viewport = document.getElementById('viewport-container');
     const canvas = document.getElementById('note-canvas');
     const ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
-
-    // UI elements
     const noteTitleInput = document.getElementById('note-title-input');
     const saveBadge = document.getElementById('save-status-badge');
     const currentPageIndicator = document.getElementById('current-page-indicator');
@@ -576,13 +745,14 @@
     const btnToggleStylus = document.getElementById('btn-toggle-stylus-mode');
     const stylusModeLabel = document.getElementById('stylus-mode-label');
     const gestureToast = document.getElementById('gesture-toast');
-    
+
+    // HUD Elements
     const livePressureHud = document.getElementById('live-pressure-hud');
     const hudPressureBar = document.getElementById('hud-pressure-bar');
     const hudPressureVal = document.getElementById('hud-pressure-val');
     const hudPointerType = document.getElementById('hud-pointer-type');
 
-    const floatingToolbar = document.getElementById('floating-toolbar');
+    // Toolbar Elements
     const toolBtns = document.querySelectorAll('.tool-btn');
     const colorPresetBtns = document.querySelectorAll('.color-preset-btn');
     const customColorInput = document.getElementById('custom-color-input');
@@ -595,6 +765,7 @@
     const shapeOptionsBox = document.getElementById('shape-options-box');
     const shapeTypeBtns = document.querySelectorAll('.shape-type-btn');
 
+    // Modals & Drawers
     const paperModal = document.getElementById('paper-modal');
     const btnPaperTemplate = document.getElementById('btn-paper-template');
     const btnClosePaperModal = document.getElementById('btn-close-paper-modal');
@@ -614,39 +785,283 @@
     const btnCloseExportModal = document.getElementById('btn-close-export-modal');
     const btnExportPng = document.getElementById('btn-export-png');
     const btnExportJson = document.getElementById('btn-export-json');
-    const importJsonInput = document.getElementById('import-json-input');
     const toast = document.getElementById('toast');
+
+    /* ==========================================================================
+       Homescreen / Library Controller
+       ========================================================================== */
+    async function loadHomescreenLibrary() {
+      appState.allNotebooks = await dbService.getAllNotebooks();
+
+      // If database is completely empty on first launch, create a helpful default starter notebook
+      if (appState.allNotebooks.length === 0) {
+        const defaultNotebook = {
+          id: 'nb_' + Date.now(),
+          title: 'iPad Quick Notes & Sketches',
+          coverColor: '#2563eb',
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          pages: [
+            {
+              id: 'p_1',
+              paper: 'graph',
+              tint: 'white',
+              strokes: [
+                // Sample welcome stroke: a gentle curve
+                {
+                  tool: 'fountain',
+                  isShape: false,
+                  color: '#2563eb',
+                  size: 3.5,
+                  points: [
+                    { x: 300, y: 350, pressure: 0.4 },
+                    { x: 500, y: 340, pressure: 0.7 },
+                    { x: 750, y: 380, pressure: 0.9 },
+                    { x: 1000, y: 350, pressure: 0.5 }
+                  ]
+                }
+              ]
+            }
+          ]
+        };
+        await dbService.saveNotebook(defaultNotebook);
+        appState.allNotebooks = [defaultNotebook];
+      }
+
+      renderNotebooksGrid();
+    }
+
+    function renderNotebooksGrid() {
+      const query = (notebookSearchInput.value || '').trim().toLowerCase();
+      const filtered = appState.allNotebooks.filter(nb => nb.title.toLowerCase().includes(query));
+
+      notebooksGrid.innerHTML = '';
+      libraryCountBadge.textContent = `${filtered.length} Notebook${filtered.length === 1 ? '' : 's'}`;
+
+      if (filtered.length === 0) {
+        notebooksGrid.innerHTML = `
+          <div class="col-span-full py-16 text-center text-slate-400 flex flex-col items-center justify-center space-y-2">
+            <i data-lucide="book-dashed" class="w-12 h-12 opacity-50"></i>
+            <p class="text-sm font-medium">No notebooks found</p>
+            <p class="text-xs">Click "New Notebook" to create your first book.</p>
+          </div>
+        `;
+        lucide.createIcons();
+        return;
+      }
+
+      filtered.forEach(nb => {
+        const pageCount = nb.pages ? nb.pages.length : 1;
+        const formattedDate = new Date(nb.updatedAt || Date.now()).toLocaleDateString(undefined, {
+          month: 'short',
+          day: 'numeric'
+        });
+
+        const card = document.createElement('div');
+        card.className = 'notebook-cover-card group relative flex flex-col cursor-pointer';
+        card.innerHTML = `
+          <!-- Notebook 3D Spine & Cover -->
+          <div class="relative w-full aspect-[3/4] rounded-2xl shadow-xl overflow-hidden flex flex-col justify-between p-4 border border-black/10 dark:border-white/10" style="background-color: ${nb.coverColor || '#2563eb'};">
+            <!-- Left Binding Spine Shadow -->
+            <div class="absolute left-0 top-0 bottom-0 w-5 notebook-spine pointer-events-none"></div>
+            
+            <!-- Cover Header Badge -->
+            <div class="flex items-center justify-between z-10 pl-3">
+              <span class="text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-white/20 text-white backdrop-blur-sm">
+                ${pageCount} ${pageCount === 1 ? 'PAGE' : 'PAGES'}
+              </span>
+
+              <!-- Quick Delete / Options menu -->
+              <button class="btn-delete-notebook p-1.5 rounded-lg bg-black/20 hover:bg-rose-600 text-white transition-all opacity-0 group-hover:opacity-100" data-id="${nb.id}" title="Delete notebook">
+                <i data-lucide="trash" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
+
+            <!-- Cover Title Box (Realistic Notebook Label) -->
+            <div class="z-10 pl-3 py-2">
+              <div class="bg-white/95 dark:bg-zinc-900/95 p-3 rounded-xl shadow-md border border-black/5 dark:border-white/10">
+                <h4 class="font-bold text-xs sm:text-sm text-slate-800 dark:text-white line-clamp-2 leading-snug">${escapeHtml(nb.title)}</h4>
+                <div class="flex items-center justify-between text-[10px] text-slate-400 mt-2 pt-1 border-t border-slate-100 dark:border-zinc-800">
+                  <span class="capitalize">${nb.pages[0]?.paper || 'Grid'}</span>
+                  <span>${formattedDate}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+
+        // Click card to open notebook editor
+        card.addEventListener('click', (e) => {
+          if (e.target.closest('.btn-delete-notebook')) return;
+          openNotebookEditor(nb.id);
+        });
+
+        notebooksGrid.appendChild(card);
+      });
+
+      // Attach delete notebook events
+      document.querySelectorAll('.btn-delete-notebook').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const targetId = btn.dataset.id;
+          if (appState.allNotebooks.length <= 1) {
+            showToast('You must keep at least one notebook.');
+            return;
+          }
+          await dbService.deleteNotebook(targetId);
+          showToast('Notebook deleted');
+          await loadHomescreenLibrary();
+        });
+      });
+
+      lucide.createIcons();
+    }
+
+    function escapeHtml(str) {
+      return String(str).replace(/[&<>"']/g, (m) => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[m]));
+    }
+
+    notebookSearchInput.addEventListener('input', renderNotebooksGrid);
+
+    // Create Notebook Dialog logic
+    let selectedCoverColor = '#2563eb';
+    let selectedDefaultPaper = 'graph';
+
+    btnOpenCreateModal.addEventListener('click', () => {
+      createNbTitle.value = '';
+      createNotebookModal.classList.remove('hidden');
+      createNotebookModal.classList.add('flex');
+      setTimeout(() => createNbTitle.focus(), 100);
+    });
+
+    btnCloseCreateModal.addEventListener('click', closeCreateModal);
+    btnCancelCreate.addEventListener('click', closeCreateModal);
+
+    function closeCreateModal() {
+      createNotebookModal.classList.add('hidden');
+      createNotebookModal.classList.remove('flex');
+    }
+
+    coverColorOpts.forEach(btn => {
+      btn.addEventListener('click', () => {
+        coverColorOpts.forEach(b => b.classList.remove('ring-2', 'ring-blue-500', 'ring-offset-2', 'dark:ring-offset-zinc-900'));
+        btn.classList.add('ring-2', 'ring-blue-500', 'ring-offset-2', 'dark:ring-offset-zinc-900');
+        selectedCoverColor = btn.dataset.color;
+      });
+    });
+
+    createPaperChoices.forEach(btn => {
+      btn.addEventListener('click', () => {
+        createPaperChoices.forEach(b => {
+          b.classList.remove('border-blue-500', 'bg-blue-50', 'dark:bg-blue-950/40');
+          b.classList.add('border-slate-200', 'dark:border-zinc-700');
+        });
+        btn.classList.add('border-blue-500', 'bg-blue-50', 'dark:bg-blue-950/40');
+        btn.classList.remove('border-slate-200', 'dark:border-zinc-700');
+        selectedDefaultPaper = btn.dataset.paper;
+      });
+    });
+
+    btnConfirmCreate.addEventListener('click', async () => {
+      const title = createNbTitle.value.trim() || 'Untitled Notebook';
+      const newNotebook = {
+        id: 'nb_' + Date.now(),
+        title: title,
+        coverColor: selectedCoverColor,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        pages: [
+          {
+            id: 'p_1',
+            paper: selectedDefaultPaper,
+            tint: 'white',
+            strokes: []
+          }
+        ]
+      };
+
+      await dbService.saveNotebook(newNotebook);
+      closeCreateModal();
+      showToast(`Created "${title}"`);
+      await loadHomescreenLibrary();
+      openNotebookEditor(newNotebook.id);
+    });
+
+    /* ==========================================================================
+       Editor Transition & Lifecycle Controller
+       ========================================================================== */
+    async function openNotebookEditor(notebookId) {
+      const nb = await dbService.getNotebook(notebookId);
+      if (!nb) {
+        showToast('Notebook not found');
+        return;
+      }
+
+      appState.activeNotebook = nb;
+      appState.currentPageIndex = 0;
+      appState.undoStack = [];
+      appState.redoStack = [];
+      appState.zoom = 1.0;
+      appState.panX = 0;
+      appState.panY = 0;
+
+      noteTitleInput.value = nb.title;
+      updatePageIndicator();
+      updatePageThumbnails();
+
+      // Smooth View Swap
+      viewHomescreen.classList.add('pointer-events-none', 'opacity-0');
+      viewEditor.classList.remove('pointer-events-none', 'opacity-0');
+      appState.currentView = 'editor';
+
+      resizeCanvas();
+      renderCurrentPage();
+    }
+
+    async function returnToHomescreen() {
+      // Force instant save before unmounting editor
+      if (appState.activeNotebook) {
+        await dbService.saveNotebook(appState.activeNotebook);
+      }
+
+      viewEditor.classList.add('pointer-events-none', 'opacity-0');
+      viewHomescreen.classList.remove('pointer-events-none', 'opacity-0');
+      appState.currentView = 'homescreen';
+      appState.activeNotebook = null;
+
+      await loadHomescreenLibrary();
+    }
+
+    btnBackToHome.addEventListener('click', returnToHomescreen);
 
     /* ==========================================================================
        Canvas Setup & High-DPI Coordinate Mapping
        ========================================================================== */
     function resizeCanvas() {
-      // Set fixed logical page dimensions
       canvas.width = PAGE_WIDTH;
       canvas.height = PAGE_HEIGHT;
       updateCanvasTransform();
       renderCurrentPage();
     }
 
-    // Centered zoom & pan transform
     function updateCanvasTransform() {
       const vWidth = viewport.clientWidth;
       const vHeight = viewport.clientHeight;
-      
-      // Calculate screen placement so the page is centered with pan & zoom
-      const left = (vWidth - PAGE_WIDTH * state.zoom) / 2 + state.panX;
-      const top = (vHeight - PAGE_HEIGHT * state.zoom) / 2 + state.panY;
 
-      canvas.style.width = `${PAGE_WIDTH * state.zoom}px`;
-      canvas.style.height = `${PAGE_HEIGHT * state.zoom}px`;
+      const left = (vWidth - PAGE_WIDTH * appState.zoom) / 2 + appState.panX;
+      const top = (vHeight - PAGE_HEIGHT * appState.zoom) / 2 + appState.panY;
+
+      canvas.style.width = `${PAGE_WIDTH * appState.zoom}px`;
+      canvas.style.height = `${PAGE_HEIGHT * appState.zoom}px`;
       canvas.style.position = 'absolute';
       canvas.style.left = `${left}px`;
       canvas.style.top = `${top}px`;
 
-      btnZoomReset.textContent = `${Math.round(state.zoom * 100)}%`;
+      btnZoomReset.textContent = `${Math.round(appState.zoom * 100)}%`;
     }
 
-    // Convert Screen (clientX, clientY) to Page Coordinates (0 to PAGE_WIDTH, 0 to PAGE_HEIGHT)
     function screenToPage(clientX, clientY) {
       const rect = canvas.getBoundingClientRect();
       const x = (clientX - rect.left) * (PAGE_WIDTH / rect.width);
@@ -654,14 +1069,12 @@
       return { x, y };
     }
 
-    // Verify if point is inside page
-    function isInsidePage(pagePt) {
-      return pagePt.x >= 0 && pagePt.x <= PAGE_WIDTH && pagePt.y >= 0 && pagePt.y <= PAGE_HEIGHT;
+    function isInsidePage(pt) {
+      return pt.x >= 0 && pt.x <= PAGE_WIDTH && pt.y >= 0 && pt.y <= PAGE_HEIGHT;
     }
 
     /* ==========================================================================
-       Procedural Paper Rendering (Lined, Grid, Dotted, Cornell, Isometric)
-       All patterns are rendered dynamically without raster scaling artifacts.
+       Procedural Paper Ruling Rendering (5mm Grid, Ruled, Dotted, Cornell, Isometric)
        ========================================================================== */
     function getPaperBackgroundColor(tint) {
       if (tint === 'cream') return '#FAF6EE';
@@ -670,15 +1083,14 @@
     }
 
     function getPaperGridLineColor(tint) {
-      if (tint === 'dark') return 'rgba(255, 255, 255, 0.08)';
-      return 'rgba(60, 80, 120, 0.12)';
+      if (tint === 'dark') return 'rgba(255, 255, 255, 0.09)';
+      return 'rgba(60, 80, 120, 0.13)';
     }
 
     function renderPaperBackground(page) {
       const bgColor = getPaperBackgroundColor(page.tint);
       const gridColor = getPaperGridLineColor(page.tint);
 
-      // 1. Fill base paper color
       ctx.fillStyle = bgColor;
       ctx.fillRect(0, 0, PAGE_WIDTH, PAGE_HEIGHT);
 
@@ -691,11 +1103,10 @@
 
       switch (page.paper) {
         case 'lined': {
-          // Standard horizontal lines
           const topMargin = 160;
           const leftMargin = 160;
 
-          // Draw horizontal ruled lines
+          // Horizontal ruled lines
           for (let y = topMargin; y < PAGE_HEIGHT - 60; y += spacing) {
             ctx.beginPath();
             ctx.moveTo(0, y);
@@ -703,8 +1114,8 @@
             ctx.stroke();
           }
 
-          // Draw standard left vertical margin rule
-          ctx.strokeStyle = page.tint === 'dark' ? 'rgba(239, 68, 68, 0.3)' : 'rgba(239, 68, 68, 0.4)';
+          // Red margin line
+          ctx.strokeStyle = page.tint === 'dark' ? 'rgba(239, 68, 68, 0.35)' : 'rgba(239, 68, 68, 0.45)';
           ctx.lineWidth = 1.5;
           ctx.beginPath();
           ctx.moveTo(leftMargin, 0);
@@ -714,14 +1125,12 @@
         }
 
         case 'graph': {
-          // Precise 5mm engineering grid
+          // Precision engineering square grid (5mm aligned)
           ctx.beginPath();
-          // Verticals
           for (let x = 0; x <= PAGE_WIDTH; x += spacing) {
             ctx.moveTo(x, 0);
             ctx.lineTo(x, PAGE_HEIGHT);
           }
-          // Horizontals
           for (let y = 0; y <= PAGE_HEIGHT; y += spacing) {
             ctx.moveTo(0, y);
             ctx.lineTo(PAGE_WIDTH, y);
@@ -732,7 +1141,7 @@
 
         case 'dotted': {
           // Bullet Journal dot matrix
-          const radius = page.tint === 'dark' ? 1.5 : 1.2;
+          const radius = page.tint === 'dark' ? 1.6 : 1.3;
           for (let x = spacing; x < PAGE_WIDTH; x += spacing) {
             for (let y = spacing; y < PAGE_HEIGHT; y += spacing) {
               ctx.beginPath();
@@ -744,30 +1153,26 @@
         }
 
         case 'cornell': {
-          // Cornell layout: Cue column on left (30%), Summary at bottom (20%)
+          // Cornell layout: Cue (left), Notes (right), Summary (bottom)
           const cueWidth = PAGE_WIDTH * 0.28;
           const summaryHeight = PAGE_HEIGHT * 0.20;
           const topHeader = 140;
 
-          // Header line
           ctx.beginPath();
           ctx.moveTo(0, topHeader);
           ctx.lineTo(PAGE_WIDTH, topHeader);
           ctx.stroke();
 
-          // Left Cue separator
           ctx.beginPath();
           ctx.moveTo(cueWidth, topHeader);
           ctx.lineTo(cueWidth, PAGE_HEIGHT - summaryHeight);
           ctx.stroke();
 
-          // Bottom Summary separator
           ctx.beginPath();
           ctx.moveTo(0, PAGE_HEIGHT - summaryHeight);
           ctx.lineTo(PAGE_WIDTH, PAGE_HEIGHT - summaryHeight);
           ctx.stroke();
 
-          // Ruled lines inside note body
           for (let y = topHeader + spacing; y < PAGE_HEIGHT - summaryHeight; y += spacing) {
             ctx.beginPath();
             ctx.moveTo(cueWidth, y);
@@ -775,23 +1180,20 @@
             ctx.stroke();
           }
 
-          // Labels
           ctx.font = '600 13px Inter';
           ctx.fillStyle = page.tint === 'dark' ? '#666' : '#999';
           ctx.fillText('CUE COLUMN / KEYWORDS', 30, topHeader + 30);
-          ctx.fillText('NOTES / LECTURE CONTENT', cueWidth + 30, topHeader + 30);
-          ctx.fillText('SUMMARY & REFLECTION', 30, PAGE_HEIGHT - summaryHeight + 35);
+          ctx.fillText('NOTES & LECTURE CONTENT', cueWidth + 30, topHeader + 30);
+          ctx.fillText('SUMMARY & TAKEAWAYS', 30, PAGE_HEIGHT - summaryHeight + 35);
           break;
         }
 
         case 'isometric': {
-          // 3D Isometric grid (60 degree angle diagonals)
           const isoH = spacing * Math.sqrt(3) / 2;
           ctx.lineWidth = 0.75;
           ctx.beginPath();
           for (let y = 0; y < PAGE_HEIGHT; y += isoH * 2) {
             for (let x = 0; x < PAGE_WIDTH; x += spacing) {
-              // Draw isometric triangles
               ctx.moveTo(x, y);
               ctx.lineTo(x + spacing / 2, y + isoH);
               ctx.lineTo(x, y + isoH * 2);
@@ -805,7 +1207,6 @@
 
         case 'blank':
         default:
-          // Blank paper needs no additional overlay lines
           break;
       }
 
@@ -813,15 +1214,13 @@
     }
 
     /* ==========================================================================
-       High-Fidelity Stylus Inking & Smoothing
-       Uses quadratic Bezier spline interpolation with dynamic pressure scaling.
+       Stylus Inking & Pressure Vector Engine
        ========================================================================== */
     function drawStroke(context, stroke) {
       if (!stroke || !stroke.points || stroke.points.length === 0) return;
 
       context.save();
 
-      // Tool blending & composite operations
       if (stroke.tool === 'highlighter') {
         context.globalCompositeOperation = 'multiply';
         context.globalAlpha = 0.38;
@@ -829,7 +1228,6 @@
         context.lineJoin = 'round';
         context.strokeStyle = stroke.color;
       } else if (stroke.tool === 'eraser') {
-        // Pixel eraser clears down to background color
         context.globalCompositeOperation = 'destination-out';
         context.lineCap = 'round';
         context.lineJoin = 'round';
@@ -842,7 +1240,6 @@
         context.fillStyle = stroke.color;
       }
 
-      // Handle Geometric Shape Strokes
       if (stroke.isShape) {
         drawGeometricShape(context, stroke);
         context.restore();
@@ -852,7 +1249,6 @@
       const pts = stroke.points;
 
       if (pts.length === 1) {
-        // Single tap dot with pressure
         const p = pts[0];
         const r = Math.max(1, (p.pressure || 0.5) * stroke.size);
         context.beginPath();
@@ -862,16 +1258,15 @@
         return;
       }
 
-      // Variable width pressure interpolation for Fountain & Monoline
+      // Variable width pressure interpolation
       if (stroke.tool === 'fountain' || stroke.tool === 'monoline') {
         for (let i = 1; i < pts.length; i++) {
           const p1 = pts[i - 1];
           const p2 = pts[i];
 
-          // Fountain pen scales width between 0.3x and 1.8x based on stylus pressure
           let width1 = stroke.size;
           let width2 = stroke.size;
-          
+
           if (stroke.tool === 'fountain') {
             const press1 = (p1.pressure !== undefined && p1.pressure > 0) ? p1.pressure : 0.5;
             const press2 = (p2.pressure !== undefined && p2.pressure > 0) ? p2.pressure : 0.5;
@@ -886,7 +1281,7 @@
           context.stroke();
         }
       } else {
-        // Highlighter and standard eraser: Smooth quadratic Bezier spline
+        // Spline interpolation for highlighter and eraser
         context.lineWidth = stroke.size;
         context.beginPath();
         context.moveTo(pts[0].x, pts[0].y);
@@ -905,7 +1300,6 @@
       context.restore();
     }
 
-    // Render Geometric Shapes (Straight Lines, Arrows, Rectangles, Ellipses)
     function drawGeometricShape(context, stroke) {
       const p1 = stroke.points[0];
       const p2 = stroke.points[stroke.points.length - 1];
@@ -925,12 +1319,11 @@
           const dx = p2.x - p1.x;
           const dy = p2.y - p1.y;
           const angle = Math.atan2(dy, dx);
-          
+
           context.moveTo(p1.x, p1.y);
           context.lineTo(p2.x, p2.y);
           context.stroke();
 
-          // Arrow head
           context.beginPath();
           context.moveTo(p2.x, p2.y);
           context.lineTo(p2.x - headlen * Math.cos(angle - Math.PI / 6), p2.y - headlen * Math.sin(angle - Math.PI / 6));
@@ -966,13 +1359,13 @@
        Full Viewport Render Pipeline
        ========================================================================== */
     function renderCurrentPage() {
-      const page = state.pages[state.currentPageIndex];
+      if (!appState.activeNotebook) return;
+      const page = appState.activeNotebook.pages[appState.currentPageIndex];
       if (!page) return;
 
-      // Clear entire canvas
       ctx.clearRect(0, 0, PAGE_WIDTH, PAGE_HEIGHT);
 
-      // 1. Render aligned paper background pattern
+      // 1. Render aligned background pattern
       renderPaperBackground(page);
 
       // 2. Render all completed strokes
@@ -980,40 +1373,37 @@
         drawStroke(ctx, stroke);
       }
 
-      // 3. Render in-progress active stroke
+      // 3. Render active in-flight stroke
       if (activeStroke) {
         drawStroke(ctx, activeStroke);
       }
 
       // 4. Render Lasso Selection Marquee
-      if (state.activeTool === 'lasso' && state.lassoPolygon.length > 1) {
+      if (appState.activeTool === 'lasso' && appState.lassoPolygon.length > 1) {
         ctx.save();
         ctx.strokeStyle = '#007AFF';
         ctx.lineWidth = 2;
         ctx.setLineDash([6, 6]);
         ctx.beginPath();
-        ctx.moveTo(state.lassoPolygon[0].x, state.lassoPolygon[0].y);
-        for (let i = 1; i < state.lassoPolygon.length; i++) {
-          ctx.lineTo(state.lassoPolygon[i].x, state.lassoPolygon[i].y);
+        ctx.moveTo(appState.lassoPolygon[0].x, appState.lassoPolygon[0].y);
+        for (let i = 1; i < appState.lassoPolygon.length; i++) {
+          ctx.lineTo(appState.lassoPolygon[i].x, appState.lassoPolygon[i].y);
         }
         ctx.stroke();
         ctx.restore();
       }
 
-      // Update undo/redo button disabled states
-      btnUndo.disabled = state.undoStack.length === 0;
-      btnRedo.disabled = state.redoStack.length === 0;
+      btnUndo.disabled = appState.undoStack.length === 0;
+      btnRedo.disabled = appState.redoStack.length === 0;
     }
 
     /* ==========================================================================
-       Apple Pencil & Stylus Touch Engine with Hardware Pressure
-       Supports Coalesced Events for 120Hz/240Hz sub-millisecond precision.
+       Apple Pencil Stylus & Multi-Touch Gesture Engine
        ========================================================================== */
     let activeStroke = null;
     let isDrawing = false;
     let activePointerId = null;
 
-    // Multi-touch gestures (two-finger pan & pinch-zoom)
     const activeTouches = new Map();
     let initialPinchDistance = 0;
     let initialPinchZoom = 1.0;
@@ -1021,9 +1411,7 @@
     let gestureCenter = { x: 0, y: 0 };
 
     function getPinchDistance(t1, t2) {
-      const dx = t1.clientX - t2.clientX;
-      const dy = t1.clientY - t2.clientY;
-      return Math.hypot(dx, dy);
+      return Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
     }
 
     function getTouchMidpoint(t1, t2) {
@@ -1033,36 +1421,33 @@
       };
     }
 
-    // Pointer Down Event
     viewport.addEventListener('pointerdown', (e) => {
-      // Manage multi-touch gestures when using fingers
+      if (appState.currentView !== 'editor') return;
+
       if (e.pointerType === 'touch') {
         activeTouches.set(e.pointerId, e);
 
-        // If two fingers are detected, trigger zoom/pan mode
         if (activeTouches.size === 2) {
           if (isDrawing && activeStroke) {
-            // Cancel drawing stroke if another finger touches down (palm rejection)
             activeStroke = null;
             isDrawing = false;
             renderCurrentPage();
           }
           const [t1, t2] = Array.from(activeTouches.values());
           initialPinchDistance = getPinchDistance(t1, t2);
-          initialPinchZoom = state.zoom;
-          initialPan = { x: state.panX, y: state.panY };
+          initialPinchZoom = appState.zoom;
+          initialPan = { x: appState.panX, y: appState.panY };
           gestureCenter = getTouchMidpoint(t1, t2);
           return;
         }
 
-        // In Pencil Only Mode, reject single finger drawing
-        if (state.pencilOnlyMode) {
-          showGestureToast('Palm rejection active: Pencil writes, 2 fingers pan & zoom');
+        // In Pencil Only Mode, palm rejection ignores single-finger draw
+        if (appState.pencilOnlyMode) {
+          showGestureToast('Palm rejection active: Pencil writes, 2 fingers pan/zoom');
           return;
         }
       }
 
-      // Check if another pointer is already drawing
       if (isDrawing) return;
 
       const pagePos = screenToPage(e.clientX, e.clientY);
@@ -1072,44 +1457,37 @@
       activePointerId = e.pointerId;
       try {
         canvas.setPointerCapture(e.pointerId);
-      } catch (err) {
-        // Fallback for browsers with restricted capture
-      }
+      } catch (err) {}
 
-      // Record undo checkpoint
       pushUndoState();
 
-      // Read Stylus Pressure (e.pressure is 0.0 to 1.0)
       const initialPressure = e.pressure !== undefined && e.pressure > 0 ? e.pressure : 0.5;
       updatePressureHud(e.pointerType, initialPressure);
 
-      // Handle Lasso Tool
-      if (state.activeTool === 'lasso') {
-        state.lassoPolygon = [pagePos];
+      if (appState.activeTool === 'lasso') {
+        appState.lassoPolygon = [pagePos];
         renderCurrentPage();
         return;
       }
 
-      // Handle Shape Tool
-      if (state.activeTool === 'shape') {
+      if (appState.activeTool === 'shape') {
         activeStroke = {
           tool: 'shape',
           isShape: true,
-          shapeType: state.activeShape,
-          color: state.strokeColor,
-          size: state.strokeSize,
+          shapeType: appState.activeShape,
+          color: appState.strokeColor,
+          size: appState.strokeSize,
           points: [pagePos, pagePos]
         };
         renderCurrentPage();
         return;
       }
 
-      // Setup Inking Stroke
       activeStroke = {
-        tool: state.activeTool,
+        tool: appState.activeTool,
         isShape: false,
-        color: state.activeTool === 'highlighter' ? state.strokeColor : state.strokeColor,
-        size: state.activeTool === 'highlighter' ? Math.max(16, state.strokeSize * 4) : state.strokeSize,
+        color: appState.strokeColor,
+        size: appState.activeTool === 'highlighter' ? Math.max(16, appState.strokeSize * 4) : appState.strokeSize,
         points: [{
           x: pagePos.x,
           y: pagePos.y,
@@ -1121,9 +1499,10 @@
       renderCurrentPage();
     });
 
-    // Pointer Move Event with Coalesced Events support
     viewport.addEventListener('pointermove', (e) => {
-      // Handle Multi-Touch Pinch Zoom and Pan
+      if (appState.currentView !== 'editor') return;
+
+      // Two finger pinch zoom and pan
       if (e.pointerType === 'touch' && activeTouches.has(e.pointerId)) {
         activeTouches.set(e.pointerId, e);
 
@@ -1135,23 +1514,21 @@
           if (initialPinchDistance > 0) {
             const scaleChange = currentDistance / initialPinchDistance;
             const newZoom = Math.min(Math.max(initialPinchZoom * scaleChange, 0.4), 4.0);
-            
-            state.panX = initialPan.x + (currentMidpoint.x - gestureCenter.x);
-            state.panY = initialPan.y + (currentMidpoint.y - gestureCenter.y);
-            state.zoom = newZoom;
+
+            appState.panX = initialPan.x + (currentMidpoint.x - gestureCenter.x);
+            appState.panY = initialPan.y + (currentMidpoint.y - gestureCenter.y);
+            appState.zoom = newZoom;
             updateCanvasTransform();
           }
           return;
         }
 
-        if (state.pencilOnlyMode) {
-          return;
-        }
+        if (appState.pencilOnlyMode) return;
       }
 
       if (!isDrawing || e.pointerId !== activePointerId) return;
 
-      // Extract Coalesced events if provided by the device (sub-frame 240Hz stylus polling)
+      // Extract Coalesced events (supports iPad 120Hz/240Hz polling rate)
       const events = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
 
       for (const ev of events) {
@@ -1159,21 +1536,20 @@
         const pressure = ev.pressure !== undefined && ev.pressure > 0 ? ev.pressure : 0.5;
         updatePressureHud(ev.pointerType, pressure);
 
-        if (state.activeTool === 'lasso') {
-          state.lassoPolygon.push(pagePos);
+        if (appState.activeTool === 'lasso') {
+          appState.lassoPolygon.push(pagePos);
           continue;
         }
 
-        if (state.activeTool === 'shape') {
+        if (appState.activeTool === 'shape') {
           if (activeStroke) {
             activeStroke.points[1] = pagePos;
           }
           continue;
         }
 
-        if (state.activeTool === 'eraser') {
-          // Object-level or pixel erase
-          performEraserCheck(pagePos, state.strokeSize * 4);
+        if (appState.activeTool === 'eraser') {
+          performEraserCheck(pagePos, appState.strokeSize * 4);
           continue;
         }
 
@@ -1190,7 +1566,6 @@
       renderCurrentPage();
     });
 
-    // Pointer Up & Cancel Events
     function handlePointerEnd(e) {
       if (e.pointerType === 'touch') {
         activeTouches.delete(e.pointerId);
@@ -1202,11 +1577,10 @@
       if (e.pointerId !== activePointerId) return;
 
       if (isDrawing) {
-        if (state.activeTool === 'lasso') {
+        if (appState.activeTool === 'lasso') {
           finalizeLasso();
         } else if (activeStroke && activeStroke.points.length > 0) {
-          // Commit stroke to current page
-          const currentPage = state.pages[state.currentPageIndex];
+          const currentPage = appState.activeNotebook.pages[appState.currentPageIndex];
           currentPage.strokes.push(activeStroke);
           activeStroke = null;
           scheduleAutoSave();
@@ -1226,41 +1600,31 @@
     viewport.addEventListener('pointerup', handlePointerEnd);
     viewport.addEventListener('pointercancel', handlePointerEnd);
 
-    // Eraser helper: removes strokes that intersect with the eraser tip
     function performEraserCheck(pos, radius) {
-      const currentPage = state.pages[state.currentPageIndex];
-      const prevLength = currentPage.strokes.length;
+      const page = appState.activeNotebook.pages[appState.currentPageIndex];
+      const prevLength = page.strokes.length;
 
-      // Filter out strokes that intersect with eraser point
-      currentPage.strokes = currentPage.strokes.filter(stroke => {
-        return !stroke.points.some(pt => {
-          return Math.hypot(pt.x - pos.x, pt.y - pos.y) <= radius;
-        });
+      page.strokes = page.strokes.filter(stroke => {
+        return !stroke.points.some(pt => Math.hypot(pt.x - pos.x, pt.y - pos.y) <= radius);
       });
 
-      if (currentPage.strokes.length !== prevLength) {
+      if (page.strokes.length !== prevLength) {
         scheduleAutoSave();
       }
     }
 
-    // Lasso Tool: Select and highlight strokes inside drawn loop
     function finalizeLasso() {
-      if (state.lassoPolygon.length < 3) {
-        state.lassoPolygon = [];
+      if (appState.lassoPolygon.length < 3) {
+        appState.lassoPolygon = [];
         return;
       }
-
-      showToast(`Selected loop created with ${state.lassoPolygon.length} bounds`);
-      // Keep polygon visible briefly then fade
+      showToast(`Selected area with ${appState.lassoPolygon.length} bounds`);
       setTimeout(() => {
-        state.lassoPolygon = [];
+        appState.lassoPolygon = [];
         renderCurrentPage();
-      }, 1500);
+      }, 1200);
     }
 
-    /* ==========================================================================
-       Stylus Pressure HUD & Visual Feedback
-       ========================================================================== */
     function updatePressureHud(pointerType, pressure) {
       livePressureHud.classList.remove('opacity-0');
       hudPointerType.textContent = pointerType === 'pen' ? 'Apple Pencil' : 'Touch';
@@ -1270,18 +1634,16 @@
 
     function hidePressureHud() {
       setTimeout(() => {
-        if (!isDrawing) {
-          livePressureHud.classList.add('opacity-0');
-        }
+        if (!isDrawing) livePressureHud.classList.add('opacity-0');
       }, 400);
     }
 
-    let toastTimeout = null;
+    let gestureTimeout = null;
     function showGestureToast(msg) {
       gestureToast.textContent = msg;
       gestureToast.classList.remove('opacity-0', '-translate-y-2');
-      clearTimeout(toastTimeout);
-      toastTimeout = setTimeout(() => {
+      clearTimeout(gestureTimeout);
+      gestureTimeout = setTimeout(() => {
         gestureToast.classList.add('opacity-0', '-translate-y-2');
       }, 2000);
     }
@@ -1298,34 +1660,30 @@
        Undo / Redo History & Debounced Auto-Saving
        ========================================================================== */
     function pushUndoState() {
-      const page = state.pages[state.currentPageIndex];
-      // Clone strokes deep snapshot
+      if (!appState.activeNotebook) return;
+      const page = appState.activeNotebook.pages[appState.currentPageIndex];
       const snapshot = JSON.parse(JSON.stringify(page.strokes));
-      state.undoStack.push(snapshot);
-      // Limit undo stack depth to 40 for optimal memory
-      if (state.undoStack.length > 40) {
-        state.undoStack.shift();
-      }
-      // Reset redo on new interaction
-      state.redoStack = [];
+      appState.undoStack.push(snapshot);
+      if (appState.undoStack.length > 40) appState.undoStack.shift();
+      appState.redoStack = [];
       btnUndo.disabled = false;
       btnRedo.disabled = true;
     }
 
     function performUndo() {
-      if (state.undoStack.length === 0) return;
-      const page = state.pages[state.currentPageIndex];
-      state.redoStack.push(JSON.parse(JSON.stringify(page.strokes)));
-      page.strokes = state.undoStack.pop();
+      if (appState.undoStack.length === 0 || !appState.activeNotebook) return;
+      const page = appState.activeNotebook.pages[appState.currentPageIndex];
+      appState.redoStack.push(JSON.parse(JSON.stringify(page.strokes)));
+      page.strokes = appState.undoStack.pop();
       renderCurrentPage();
       scheduleAutoSave();
     }
 
     function performRedo() {
-      if (state.redoStack.length === 0) return;
-      const page = state.pages[state.currentPageIndex];
-      state.undoStack.push(JSON.parse(JSON.stringify(page.strokes)));
-      page.strokes = state.redoStack.pop();
+      if (appState.redoStack.length === 0 || !appState.activeNotebook) return;
+      const page = appState.activeNotebook.pages[appState.currentPageIndex];
+      appState.undoStack.push(JSON.parse(JSON.stringify(page.strokes)));
+      page.strokes = appState.redoStack.pop();
       renderCurrentPage();
       scheduleAutoSave();
     }
@@ -1333,33 +1691,24 @@
     btnUndo.addEventListener('click', performUndo);
     btnRedo.addEventListener('click', performRedo);
 
-    // Keyboard Shortcuts (Cmd+Z, Cmd+Shift+Z)
     window.addEventListener('keydown', (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
         e.preventDefault();
-        if (e.shiftKey) {
-          performRedo();
-        } else {
-          performUndo();
-        }
+        if (e.shiftKey) performRedo();
+        else performUndo();
       }
     });
 
-    // Debounced AutoSave with visual status badge
     let autoSaveTimer = null;
     function scheduleAutoSave() {
+      if (!appState.activeNotebook) return;
       saveBadge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-amber-500 mr-1 animate-ping"></span> Saving...`;
       saveBadge.className = 'inline-flex items-center text-[10px] font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300';
 
       clearTimeout(autoSaveTimer);
       autoSaveTimer = setTimeout(async () => {
         try {
-          await storage.saveDoc({
-            id: state.docId,
-            title: state.title,
-            pages: state.pages,
-            updatedAt: Date.now()
-          });
+          await dbService.saveNotebook(appState.activeNotebook);
           saveBadge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1"></span> Saved`;
           saveBadge.className = 'inline-flex items-center text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400';
           updatePageThumbnails();
@@ -1370,12 +1719,12 @@
     }
 
     /* ==========================================================================
-       Toolbar & Tool State Interactions
+       Toolbar & Tool Buttons
        ========================================================================== */
     toolBtns.forEach(btn => {
       btn.addEventListener('click', () => {
         const tool = btn.dataset.tool;
-        state.activeTool = tool;
+        appState.activeTool = tool;
 
         toolBtns.forEach(b => {
           b.classList.remove('bg-white', 'dark:bg-slate-700', 'shadow-md');
@@ -1385,7 +1734,6 @@
         btn.classList.add('bg-white', 'dark:bg-slate-700', 'shadow-md');
         btn.querySelector('.tool-indicator')?.classList.remove('hidden');
 
-        // Toggle shape configuration options
         if (tool === 'shape') {
           shapeOptionsBox.classList.remove('hidden');
           shapeOptionsBox.classList.add('flex');
@@ -1398,24 +1746,21 @@
       });
     });
 
-    // Color Presets Selection
     colorPresetBtns.forEach(btn => {
       btn.addEventListener('click', () => {
         colorPresetBtns.forEach(b => b.classList.remove('ring-2', 'ring-blue-500'));
         btn.classList.add('ring-2', 'ring-blue-500');
-        state.strokeColor = btn.dataset.color;
-        sizePreviewDot.style.backgroundColor = state.strokeColor;
+        appState.strokeColor = btn.dataset.color;
+        sizePreviewDot.style.backgroundColor = appState.strokeColor;
       });
     });
 
-    // Custom Color Input
     customColorInput.addEventListener('input', (e) => {
-      state.strokeColor = e.target.value;
-      sizePreviewDot.style.backgroundColor = state.strokeColor;
+      appState.strokeColor = e.target.value;
+      sizePreviewDot.style.backgroundColor = appState.strokeColor;
       colorPresetBtns.forEach(b => b.classList.remove('ring-2', 'ring-blue-500'));
     });
 
-    // Stroke Size Slider & Popover
     btnSizeSettings.addEventListener('click', (e) => {
       e.stopPropagation();
       sizePopover.classList.toggle('hidden');
@@ -1431,7 +1776,7 @@
 
     strokeSlider.addEventListener('input', (e) => {
       const val = parseFloat(e.target.value);
-      state.strokeSize = val;
+      appState.strokeSize = val;
       strokeSizeLabel.textContent = `${val}px`;
       popoverSizeText.textContent = `${val} px`;
       sizePreviewDot.style.transform = `scale(${Math.min(2.0, Math.max(0.6, val / 4))})`;
@@ -1440,7 +1785,7 @@
     document.querySelectorAll('.size-preset-pill').forEach(btn => {
       btn.addEventListener('click', () => {
         const sz = parseFloat(btn.dataset.size);
-        state.strokeSize = sz;
+        appState.strokeSize = sz;
         strokeSlider.value = sz;
         strokeSizeLabel.textContent = `${sz}px`;
         popoverSizeText.textContent = `${sz} px`;
@@ -1448,17 +1793,20 @@
       });
     });
 
-    // Shape Type Selection
     shapeTypeBtns.forEach(btn => {
       btn.addEventListener('click', () => {
-        shapeTypeBtns.forEach(b => b.classList.remove('bg-blue-600', 'text-white'));
+        shapeTypeBtns.forEach(b => {
+          b.classList.remove('bg-blue-600', 'text-white');
+          b.classList.add('bg-black/5', 'dark:bg-white/10');
+        });
         btn.classList.add('bg-blue-600', 'text-white');
-        state.activeShape = btn.dataset.shape;
+        btn.classList.remove('bg-black/5', 'dark:bg-white/10');
+        appState.activeShape = btn.dataset.shape;
       });
     });
 
     /* ==========================================================================
-       Paper Template Switcher & Tint Controls
+       Paper Template Switcher & Pencil Mode
        ========================================================================== */
     btnPaperTemplate.addEventListener('click', () => {
       paperModal.classList.remove('hidden');
@@ -1480,7 +1828,7 @@
         card.classList.remove('border-transparent');
 
         const paperType = card.dataset.paper;
-        state.pages[state.currentPageIndex].paper = paperType;
+        appState.activeNotebook.pages[appState.currentPageIndex].paper = paperType;
         renderCurrentPage();
         scheduleAutoSave();
       });
@@ -1492,36 +1840,34 @@
         btn.classList.add('ring-2', 'ring-blue-500');
 
         const tint = btn.dataset.tint;
-        state.pages[state.currentPageIndex].tint = tint;
+        appState.activeNotebook.pages[appState.currentPageIndex].tint = tint;
         renderCurrentPage();
         scheduleAutoSave();
       });
     });
 
-    // Pencil Only Mode Toggle
     btnToggleStylus.addEventListener('click', () => {
-      state.pencilOnlyMode = !state.pencilOnlyMode;
-      if (state.pencilOnlyMode) {
+      appState.pencilOnlyMode = !appState.pencilOnlyMode;
+      if (appState.pencilOnlyMode) {
         btnToggleStylus.className = 'flex items-center space-x-1 px-2.5 py-1 rounded-xl text-xs font-medium transition-all bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-500/20';
         stylusModeLabel.textContent = 'Pencil Only';
-        showToast('Pencil Only: Single finger will not draw accidentally');
+        showToast('Pencil Only mode: palm rejection active');
       } else {
         btnToggleStylus.className = 'flex items-center space-x-1 px-2.5 py-1 rounded-xl text-xs font-medium transition-all bg-slate-300 dark:bg-slate-700 text-slate-800 dark:text-slate-200';
         stylusModeLabel.textContent = 'Touch Draw';
-        showToast('Touch Draw enabled: Finger drawing turned on');
+        showToast('Touch Draw enabled: Finger writes & draws');
       }
     });
 
-    // Zoom Reset Button
     btnZoomReset.addEventListener('click', () => {
-      state.zoom = 1.0;
-      state.panX = 0;
-      state.panY = 0;
+      appState.zoom = 1.0;
+      appState.panX = 0;
+      appState.panY = 0;
       updateCanvasTransform();
     });
 
     /* ==========================================================================
-       Multi-Page Notebook Drawer & Page Management
+       Multi-Page Notebook Drawer Controller
        ========================================================================== */
     btnTogglePages.addEventListener('click', () => {
       pagesDrawer.classList.toggle('-translate-x-full');
@@ -1533,46 +1879,49 @@
     });
 
     btnAddPage.addEventListener('click', () => {
-      const newPageId = `page_${Date.now()}`;
-      const previousPage = state.pages[state.currentPageIndex];
+      if (!appState.activeNotebook) return;
+      const previousPage = appState.activeNotebook.pages[appState.currentPageIndex];
 
-      state.pages.push({
-        id: newPageId,
-        paper: previousPage ? previousPage.paper : 'grid',
+      appState.activeNotebook.pages.push({
+        id: 'page_' + Date.now(),
+        paper: previousPage ? previousPage.paper : 'graph',
         tint: previousPage ? previousPage.tint : 'white',
         strokes: []
       });
 
-      state.currentPageIndex = state.pages.length - 1;
-      state.undoStack = [];
-      state.redoStack = [];
+      appState.currentPageIndex = appState.activeNotebook.pages.length - 1;
+      appState.undoStack = [];
+      appState.redoStack = [];
 
       updatePageIndicator();
       updatePageThumbnails();
       renderCurrentPage();
       scheduleAutoSave();
-      showToast(`Added Page ${state.pages.length}`);
+      showToast(`Added Page ${appState.activeNotebook.pages.length}`);
     });
 
     btnClearCurrentPage.addEventListener('click', () => {
+      if (!appState.activeNotebook) return;
       pushUndoState();
-      state.pages[state.currentPageIndex].strokes = [];
+      appState.activeNotebook.pages[appState.currentPageIndex].strokes = [];
       renderCurrentPage();
       scheduleAutoSave();
       showToast('Cleared active page');
     });
 
     function updatePageIndicator() {
-      currentPageIndicator.textContent = `Page ${state.currentPageIndex + 1} of ${state.pages.length}`;
-      drawerDocSummary.textContent = `${state.pages.length} Pages Total`;
+      if (!appState.activeNotebook) return;
+      currentPageIndicator.textContent = `Page ${appState.currentPageIndex + 1} of ${appState.activeNotebook.pages.length}`;
+      drawerDocSummary.textContent = `${appState.activeNotebook.pages.length} Pages Total`;
     }
 
     function updatePageThumbnails() {
+      if (!appState.activeNotebook) return;
       pagesList.innerHTML = '';
 
-      state.pages.forEach((page, index) => {
+      appState.activeNotebook.pages.forEach((page, index) => {
         const item = document.createElement('div');
-        const isActive = index === state.currentPageIndex;
+        const isActive = index === appState.currentPageIndex;
 
         item.className = `p-3 rounded-2xl border-2 cursor-pointer transition-all flex items-center justify-between ${
           isActive 
@@ -1590,7 +1939,7 @@
               <div class="text-xs text-slate-400 capitalize">${page.paper} • ${page.strokes.length} strokes</div>
             </div>
           </div>
-          ${state.pages.length > 1 ? `
+          ${appState.activeNotebook.pages.length > 1 ? `
             <button class="btn-delete-page p-1.5 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40" data-index="${index}" title="Delete Page">
               <i data-lucide="trash" class="w-4 h-4"></i>
             </button>
@@ -1599,9 +1948,9 @@
 
         item.addEventListener('click', (e) => {
           if (e.target.closest('.btn-delete-page')) return;
-          state.currentPageIndex = index;
-          state.undoStack = [];
-          state.redoStack = [];
+          appState.currentPageIndex = index;
+          appState.undoStack = [];
+          appState.redoStack = [];
           updatePageIndicator();
           renderCurrentPage();
           pagesDrawer.classList.add('-translate-x-full');
@@ -1610,16 +1959,15 @@
         pagesList.appendChild(item);
       });
 
-      // Attach delete page listeners
       document.querySelectorAll('.btn-delete-page').forEach(btn => {
         btn.addEventListener('click', (e) => {
           e.stopPropagation();
           const delIndex = parseInt(btn.dataset.index, 10);
-          if (state.pages.length <= 1) return;
+          if (appState.activeNotebook.pages.length <= 1) return;
 
-          state.pages.splice(delIndex, 1);
-          if (state.currentPageIndex >= state.pages.length) {
-            state.currentPageIndex = state.pages.length - 1;
+          appState.activeNotebook.pages.splice(delIndex, 1);
+          if (appState.currentPageIndex >= appState.activeNotebook.pages.length) {
+            appState.currentPageIndex = appState.activeNotebook.pages.length - 1;
           }
           updatePageIndicator();
           updatePageThumbnails();
@@ -1633,7 +1981,7 @@
     }
 
     /* ==========================================================================
-       Export (High-Res Retina PNG, JSON Document Backup & Restore)
+       Export & Import Pipelines (PNG, JSON Notebook Backup)
        ========================================================================== */
     btnExportModal.addEventListener('click', () => {
       exportModal.classList.remove('hidden');
@@ -1645,11 +1993,10 @@
       exportModal.classList.remove('flex');
     });
 
-    // Export High-Res PNG
     btnExportPng.addEventListener('click', () => {
       const dataUrl = canvas.toDataURL('image/png', 1.0);
       const link = document.createElement('a');
-      link.download = `${state.title.replace(/\s+/g, '_')}_Page_${state.currentPageIndex + 1}.png`;
+      link.download = `${appState.activeNotebook.title.replace(/\s+/g, '_')}_Page_${appState.currentPageIndex + 1}.png`;
       link.href = dataUrl;
       link.click();
       exportModal.classList.add('hidden');
@@ -1657,28 +2004,27 @@
       showToast('Exported High-Res PNG');
     });
 
-    // Export Vector JSON Backup
     btnExportJson.addEventListener('click', () => {
       const docData = {
-        title: state.title,
-        pages: state.pages,
+        title: appState.activeNotebook.title,
+        coverColor: appState.activeNotebook.coverColor,
+        pages: appState.activeNotebook.pages,
         exportedAt: new Date().toISOString()
       };
       const jsonStr = JSON.stringify(docData, null, 2);
       const blob = new Blob([jsonStr], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
-      link.download = `${state.title.replace(/\s+/g, '_')}_Backup.json`;
+      link.download = `${appState.activeNotebook.title.replace(/\s+/g, '_')}.json`;
       link.href = url;
       link.click();
       URL.revokeObjectURL(url);
       exportModal.classList.add('hidden');
       exportModal.classList.remove('flex');
-      showToast('Exported Note Document (.json)');
+      showToast('Exported Notebook Backup');
     });
 
-    // Import Document JSON
-    importJsonInput.addEventListener('change', (e) => {
+    importNotebookFile.addEventListener('change', (e) => {
       const file = e.target.files[0];
       if (!file) return;
 
@@ -1687,75 +2033,65 @@
         try {
           const parsed = JSON.parse(evt.target.result);
           if (parsed.pages && Array.isArray(parsed.pages)) {
-            state.title = parsed.title || 'Restored Note';
-            state.pages = parsed.pages;
-            state.currentPageIndex = 0;
-            state.undoStack = [];
-            state.redoStack = [];
-
-            noteTitleInput.value = state.title;
-            updatePageIndicator();
-            updatePageThumbnails();
-            renderCurrentPage();
-            scheduleAutoSave();
-
-            exportModal.classList.add('hidden');
-            exportModal.classList.remove('flex');
-            showToast('Document restored successfully!');
+            const importedNotebook = {
+              id: 'nb_' + Date.now(),
+              title: parsed.title || 'Imported Notebook',
+              coverColor: parsed.coverColor || '#4338ca',
+              createdAt: Date.now(),
+              updatedAt: Date.now(),
+              pages: parsed.pages
+            };
+            await dbService.saveNotebook(importedNotebook);
+            showToast('Notebook imported successfully!');
+            await loadHomescreenLibrary();
           }
         } catch (err) {
           showToast('Failed to parse backup file');
         }
       };
       reader.readAsText(file);
+      importNotebookFile.value = '';
     });
 
     /* ==========================================================================
-       Dark Mode, Document Title, and Startup Lifecycle
+       Dark Mode, Document Title, and App Lifecycle
        ========================================================================== */
-    const btnToggleDark = document.getElementById('btn-toggle-dark');
-    btnToggleDark.addEventListener('click', () => {
+    function toggleDarkMode() {
       document.documentElement.classList.toggle('dark');
-      renderCurrentPage();
-    });
+      if (appState.currentView === 'editor') {
+        renderCurrentPage();
+      }
+    }
+
+    document.getElementById('btn-home-toggle-dark').addEventListener('click', toggleDarkMode);
+    document.getElementById('btn-editor-toggle-dark').addEventListener('click', toggleDarkMode);
 
     noteTitleInput.addEventListener('change', () => {
-      state.title = noteTitleInput.value.trim() || 'Untitled Note';
+      if (!appState.activeNotebook) return;
+      appState.activeNotebook.title = noteTitleInput.value.trim() || 'Untitled Notebook';
       scheduleAutoSave();
     });
 
     window.addEventListener('resize', () => {
-      updateCanvasTransform();
-      renderCurrentPage();
+      if (appState.currentView === 'editor') {
+        updateCanvasTransform();
+        renderCurrentPage();
+      }
     });
 
-    // App Startup Bootstrapper
+    // App Initialization Bootstrapper
     window.addEventListener('DOMContentLoaded', async () => {
-      // Initialize Lucide icons
       lucide.createIcons();
 
-      // Load saved state from IndexedDB
-      try {
-        await storage.init();
-        const saved = await storage.loadDoc(state.docId);
-        if (saved) {
-          state.title = saved.title || state.title;
-          state.pages = saved.pages && saved.pages.length > 0 ? saved.pages : state.pages;
-          noteTitleInput.value = state.title;
-        }
-      } catch (err) {
-        console.warn('Using fresh session memory');
-      }
+      // Initialize IndexedDB database and display Homescreen
+      await dbService.init();
+      await loadHomescreenLibrary();
 
-      resizeCanvas();
-      updatePageIndicator();
-      updatePageThumbnails();
-
-      // Ensure active tool visually selected
-      const defaultToolBtn = document.querySelector('[data-tool="fountain"]');
-      if (defaultToolBtn) {
-        defaultToolBtn.classList.add('bg-white', 'dark:bg-slate-700', 'shadow-md');
-        defaultToolBtn.querySelector('.tool-indicator')?.classList.remove('hidden');
+      // Default active tool styling
+      const defaultTool = document.querySelector('[data-tool="fountain"]');
+      if (defaultTool) {
+        defaultTool.classList.add('bg-white', 'dark:bg-slate-700', 'shadow-md');
+        defaultTool.querySelector('.tool-indicator')?.classList.remove('hidden');
       }
     });
   </script>
